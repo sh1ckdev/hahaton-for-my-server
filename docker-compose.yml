@@ -5,10 +5,14 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
+      args:
+        - INTERNAL_PORT=${INTERNAL_PORT:-3000}
     container_name: rational-assistant-frontend
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "${EXTERNAL_PORT:-3001}:${INTERNAL_PORT:-3000}"
+    environment:
+      - INTERNAL_PORT=${INTERNAL_PORT:-3000}
     networks:
       - rational-assistant-network
 

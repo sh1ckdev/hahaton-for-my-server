@@ -22,15 +22,18 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Аргумент для внутреннего порта
+ARG INTERNAL_PORT=3000
+
 # Устанавливаем serve для раздачи статических файлов
 RUN npm install -g serve
 
 # Копируем собранные файлы из builder
 COPY --from=builder /app/dist ./dist
 
-# Открываем порт 3000
-EXPOSE 3000
+# Открываем порт (используем переменную или значение по умолчанию)
+EXPOSE ${INTERNAL_PORT}
 
-# Запускаем serve
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Запускаем serve с портом из переменной окружения
+CMD sh -c "serve -s dist -l ${INTERNAL_PORT:-3000}"
 
