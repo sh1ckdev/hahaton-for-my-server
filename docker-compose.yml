@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: rational-assistant-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - rational-assistant-network
+
+networks:
+  rational-assistant-network:
+    driver: bridge
+

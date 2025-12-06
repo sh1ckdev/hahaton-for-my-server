@@ -18,17 +18,19 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production
-FROM nginx:alpine
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Устанавливаем serve для раздачи статических файлов
+RUN npm install -g serve
 
 # Копируем собранные файлы из builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist ./dist
 
-# Копируем конфигурацию nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Открываем порт 3000
+EXPOSE 3000
 
-# Открываем порт 80
-EXPOSE 80
-
-# Запускаем nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Запускаем serve
+CMD ["serve", "-s", "dist", "-l", "3000"]
 
