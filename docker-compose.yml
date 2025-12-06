@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rational-assistant-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - rational-assistant-network
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:7
+    container_name: rational-assistant-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - rational-assistant-network
+
+networks:
+  rational-assistant-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
