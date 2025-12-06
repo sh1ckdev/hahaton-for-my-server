@@ -5,6 +5,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Аргумент для API URL (build-time, требуется для Vite)
+ARG VITE_API_URL=http://localhost:5000/api
+
+# Переменная окружения для Vite (Vite требует переменные с префиксом VITE_)
+ENV VITE_API_URL=${VITE_API_URL}
+
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
