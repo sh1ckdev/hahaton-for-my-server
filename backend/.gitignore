@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs (if using build step)
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+mongodb-data/
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cert
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
+temp/
+tmp/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# Local files
+*.local
+
