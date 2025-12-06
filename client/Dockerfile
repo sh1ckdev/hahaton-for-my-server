@@ -22,8 +22,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Аргумент для внутреннего порта
+# Аргумент для внутреннего порта (build-time)
 ARG INTERNAL_PORT=3000
+
+# Переменная окружения для runtime
+ENV INTERNAL_PORT=${INTERNAL_PORT}
 
 # Устанавливаем serve для раздачи статических файлов
 RUN npm install -g serve
