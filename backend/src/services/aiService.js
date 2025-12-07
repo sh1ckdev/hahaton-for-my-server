@@ -13,19 +13,46 @@ if (openRouterAvailable) {
   console.log("⚠️ OpenRouter недоступен");
 }
 
+// Полный список доступных категорий для классификации
+const AVAILABLE_CATEGORIES = [
+  "Рестораны и кафе",
+  "Фастфуд",
+  "Кофе навынос",
+  "Доставка еды",
+  "Такси и каршеринг",
+  "Подписки и сервисы",
+  "Онлайн-шопинг",
+  "Развлечения",
+  "Игры и внутриигровые покупки",
+  "Алкоголь и табак",
+  "Электроника и гаджеты",
+  "Одежда и аксессуары",
+  "Красота и уход",
+  "Путешествия",
+  "Хобби",
+  "Азарт",
+  "Казино",
+  "Техника",
+  "Другое"
+];
+
 // Улучшенный fallback
 const localFallback = (text) => {
   text = text.toLowerCase();
 
   const categories = [
-    { patterns: [/казино|азарт|ставк|бет|деп.*кази|рулетк|покер|блэкджек|слот|игров.*автомат/], category: "азарт" },
-    { patterns: [/playstation|xbox|steam|игра|game|nintendo/], category: "игры" },
-    { patterns: [/телефон|смартфон|iphone|android/, /ноутбук|laptop|macbook/, /пк|компьютер|pc/], category: "техника" },
-    { patterns: [/одежд|куртк|пальто|джинс|футболк|рубашк/], category: "одежда" },
-    { patterns: [/подписк|netflix|spotify|яндекс.музык|кино|стрим/], category: "развлечения" },
-    { patterns: [/поездк|авиабилет|отель|путешеств|тур|отпуск/], category: "путешествия" },
-    { patterns: [/еда|ресторан|кафе|продукт|супермаркет|магазин/], category: "еда" },
-    { patterns: [/транспорт|такси|бензин|заправк|автобус|метро/], category: "транспорт" },
+    { patterns: [/казино|азарт|ставк|бет|деп.*кази|рулетк|покер|блэкджек|слот|игров.*автомат/], category: "Азарт" },
+    { patterns: [/playstation|xbox|steam|игра|game|nintendo|видеоигр/], category: "Игры и внутриигровые покупки" },
+    { patterns: [/телефон|смартфон|iphone|android|ноутбук|laptop|macbook|пк|компьютер|pc|техник|гаджет/], category: "Электроника и гаджеты" },
+    { patterns: [/одежд|куртк|пальто|джинс|футболк|рубашк|аксессуар/], category: "Одежда и аксессуары" },
+    { patterns: [/подписк|netflix|spotify|яндекс.музык|кино|стрим|сервис/], category: "Подписки и сервисы" },
+    { patterns: [/поездк|авиабилет|отель|путешеств|тур|отпуск/], category: "Путешествия" },
+    { patterns: [/пицц|суши|бургер|шаурм|ролл|доставк.*ед|ед.*на.*дом|доставк.*пицц/], category: "Доставка еды" },
+    { patterns: [/ресторан|кафе|обед.*ресторан|ужин.*кафе|поход.*ресторан/], category: "Рестораны и кафе" },
+    { patterns: [/макдональдс|kfc|бургер.*кинг|фастфуд|быстр.*ед/], category: "Фастфуд" },
+    { patterns: [/кофе|starbucks|кофейн/], category: "Кофе навынос" },
+    { patterns: [/такси|каршеринг|транспорт|бензин|заправк|автобус|метро/], category: "Такси и каршеринг" },
+    { patterns: [/развлечен|кино|концерт|театр|клуб/], category: "Развлечения" },
   ];
 
   for (const { patterns, category } of categories) {
@@ -34,7 +61,7 @@ const localFallback = (text) => {
     }
   }
 
-  return "другое";
+  return "Другое";
 };
 
 // Функция с ретраями для OpenRouter
@@ -180,24 +207,21 @@ export const classifyCategory = async (title = "", description = "", excludeCate
   }
 
   try {
-    // Базовые категории (включая азартные игры)
-    const baseCategories = ["игры", "азарт", "казино", "техника", "одежда", "развлечения", "путешествия", "другое"];
-    
-    // Объединяем базовые категории с запрещенными категориями пользователя
-    const allCategories = [...new Set([...baseCategories, ...excludeCategories])];
+    // Объединяем полный список категорий с запрещенными категориями пользователя
+    const allCategories = [...new Set([...AVAILABLE_CATEGORIES, ...excludeCategories])];
     
     // Формируем секцию для запрещенных категорий
     let excludeCategoriesSection = "";
     if (excludeCategories.length > 0) {
-      excludeCategoriesSection = `КРИТИЧЕСКИ ВАЖНО: У пользователя есть список запрещенных категорий, которые он контролирует:\n${excludeCategories.map(cat => `- "${cat}"`).join('\n')}\n\nПРАВИЛА КЛАССИФИКАЦИИ:\n1. Если покупка относится к одной из запрещенных категорий (даже частично) - ОБЯЗАТЕЛЬНО верни ТОЧНОЕ название этой категории из списка выше.\n2. Например, если в запрещенных есть "пицца" или "фастфуд", а покупка - "пицца пепперони", верни "пицца" (если это точное совпадение) или соответствующую запрещенную категорию.\n3. Если покупка не относится к запрещенным категориям, выбери из базовых категорий.\n\n`;
+      excludeCategoriesSection = `КРИТИЧЕСКИ ВАЖНО: У пользователя есть список запрещенных категорий, которые он контролирует:\n${excludeCategories.map(cat => `- "${cat}"`).join('\n')}\n\nПРАВИЛА КЛАССИФИКАЦИИ:\n1. Если покупка относится к одной из запрещенных категорий (даже частично) - ОБЯЗАТЕЛЬНО верни ТОЧНОЕ название этой категории из списка выше.\n2. Например, если в запрещенных есть "Доставка еды" или "Фастфуд", а покупка - "пицца пепперони", верни соответствующую запрещенную категорию.\n3. Если покупка не относится к запрещенным категориям, выбери из доступных категорий ниже.\n\n`;
     }
     
     // Формируем список доступных категорий
     let availableCategories = "";
     if (excludeCategories.length > 0) {
-      availableCategories = `Запрещенные (приоритет): ${excludeCategories.join(', ')}\nБазовые: ${baseCategories.join(', ')}`;
+      availableCategories = `Запрещенные (приоритет): ${excludeCategories.join(', ')}\nДоступные: ${AVAILABLE_CATEGORIES.join(', ')}`;
     } else {
-      availableCategories = allCategories.join(', ');
+      availableCategories = AVAILABLE_CATEGORIES.join(', ');
     }
     
     // Пытаемся загрузить промпт из БД
@@ -215,8 +239,14 @@ export const classifyCategory = async (title = "", description = "", excludeCate
       prompt = `Определи категорию покупки по названию и описанию: "${text}"
 
 ВАЖНО: Распознавание азартных игр:
-- "казик", "казино", "деп в казино", "ставки", "бет", "рулетка", "покер", "слоты" → категория "азарт" или "казино"
-- "игры" относится к видеоиграм (PlayStation, Xbox, Steam и т.д.)
+- "казик", "казино", "деп в казино", "ставки", "бет", "рулетка", "покер", "слоты" → категория "Азарт" или "Казино"
+- "игры" относится к видеоиграм (PlayStation, Xbox, Steam и т.д.) → категория "Игры и внутриигровые покупки"
+
+ВАЖНО: Распознавание еды и ресторанов:
+- "пицца", "суши", "бургер", "шаурма", "роллы", "доставка еды", "еда на дом" → категория "Доставка еды"
+- "ресторан", "кафе", "обед в ресторане", "ужин в кафе" → категория "Рестораны и кафе"
+- "макдональдс", "kfc", "бургер кинг", "фастфуд" → категория "Фастфуд"
+- "кофе", "кофе навынос", "стаarbucks" → категория "Кофе навынос"
 
 ${excludeCategoriesSection}Доступные категории для выбора:
 ${availableCategories}
@@ -234,7 +264,7 @@ ${availableCategories}
       throw new Error("Empty response from AI");
     }
 
-    // Валидация: проверяем сначала в запрещенных категориях, потом в базовых
+    // Валидация: проверяем сначала в запрещенных категориях, потом в доступных
     let category;
     const matchedExcluded = excludeCategories.find(cat => 
       out.includes(cat.toLowerCase()) || cat.toLowerCase().includes(out)
@@ -242,14 +272,21 @@ ${availableCategories}
     
     if (matchedExcluded) {
       category = matchedExcluded;
-    } else if (allCategories.some(cat => cat.toLowerCase() === out)) {
-      category = out;
     } else {
-      // Если не нашли точное совпадение, пробуем найти похожую категорию
-      const found = allCategories.find(cat => 
-        cat.toLowerCase().includes(out) || out.includes(cat.toLowerCase())
+      // Ищем точное совпадение (без учета регистра)
+      const exactMatch = allCategories.find(cat => 
+        cat.toLowerCase() === out
       );
-      category = found || localFallback(text);
+      
+      if (exactMatch) {
+        category = exactMatch;
+      } else {
+        // Если не нашли точное совпадение, пробуем найти похожую категорию
+        const found = allCategories.find(cat => 
+          cat.toLowerCase().includes(out) || out.includes(cat.toLowerCase())
+        );
+        category = found || localFallback(text);
+      }
     }
     
     // Сохраняем в кэш

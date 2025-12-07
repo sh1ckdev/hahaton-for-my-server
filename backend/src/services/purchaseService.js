@@ -46,8 +46,8 @@ export const createPurchase = async (user, payload) => {
     // Получаем список запрещенных категорий пользователя
     const excludeCategories = user.notificationSettings?.excludeCategories || [];
     aiCategory = await classifyCategory(finalTitle, description || url || "", excludeCategories);
-    // Используем категорию от AI, если она определена, иначе fallback на "другое"
-    finalCategory = aiCategory || "другое";
+    // Используем категорию от AI, если она определена, иначе fallback на "Другое"
+    finalCategory = aiCategory || "Другое";
   } else {
     // Если категория указана вручную, используем её
     finalCategory = category;
