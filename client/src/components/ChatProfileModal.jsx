@@ -161,27 +161,29 @@ const ChatProfileModal = observer(({ onComplete }) => {
         });
       }
 
-      // Создаем финансовые цели
+      // Создаем финансовые цели (параллельно для ускорения)
       if (profileData.goals && profileData.goals.length > 0) {
-        for (const goal of profileData.goals) {
-          if (goal.title && goal.price) {
-            try {
-              await goalStore.createGoal(userStore.userId, {
-                title: goal.title,
-                price: Number(goal.price) || 0,
-                priority: Number(goal.priority) || 5,
-                description: goal.description || ""
-              });
-            } catch (error) {
+        const goalPromises = profileData.goals
+          .filter(goal => goal.title && goal.price)
+          .map(goal => 
+            goalStore.createGoal(userStore.userId, {
+              title: goal.title,
+              price: Number(goal.price) || 0,
+              priority: Number(goal.priority) || 5,
+              description: goal.description || ""
+            }).catch(error => {
               console.error(`Ошибка при создании цели "${goal.title}":`, error);
-            }
-          }
-        }
+              return null; // Продолжаем создание других целей даже при ошибке
+            })
+          );
+        
+        await Promise.all(goalPromises);
       }
 
-      // Генерируем blacklist
+      // Генерируем blacklist (неблокирующая операция с увеличенным timeout)
       if (profileData.extendedProfile) {
-        const contextText = `
+        try {
+          const contextText = `
 Зарплата: ${profileData.salary || 0}₽/месяц
 Откладывает: ${profileData.savingsPerMonth || 0}₽/месяц
 Текущие накопления: ${profileData.currentSavings || 0}₽
@@ -192,16 +194,26 @@ const ChatProfileModal = observer(({ onComplete }) => {
 Категории, мешающие целям: ${(profileData.extendedProfile.blockingCategories || []).join(", ")}
 Процент отложений: ${profileData.extendedProfile.savingsPercentage || 0}%
 Есть долги: ${profileData.extendedProfile.hasDebts ? "да" : "нет"}
-        `.trim();
+          `.trim();
 
-        const blacklistResponse = await api.post("/ai/suggest-blacklist", {
-          profileSummary: contextText
-        });
-
-        if (blacklistResponse.data.categories && blacklistResponse.data.categories.length > 0) {
-          await api.post(`/users/${userStore.userId}/blacklist`, {
-            categories: blacklistResponse.data.categories
+          // Используем увеличенный timeout для AI-запроса (30 секунд)
+          const blacklistResponse = await api.post("/ai/suggest-blacklist", {
+            profileSummary: contextText
+          }, {
+            timeout: 30000 // 30 секунд для AI-запроса
           });
+
+          if (blacklistResponse.data.categories && blacklistResponse.data.categories.length > 0) {
+            await api.post(`/users/${userStore.userId}/blacklist`, {
+              categories: blacklistResponse.data.categories
+            }, {
+              timeout: 10000
+            });
+          }
+        } catch (error) {
+          // Если генерация blacklist не удалась, не блокируем сохранение профиля
+          console.warn("Не удалось сгенерировать blacklist, но профиль сохранен:", error);
+          // Можно показать уведомление пользователю, но не критично
         }
       }
 
