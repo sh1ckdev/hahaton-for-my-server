@@ -5,6 +5,7 @@ export class UIStore {
   showInitialBlacklistModal = false;
   showPaymentConfirmationModal = false;
   showAddPurchaseModal = false;
+  showChatProfileModal = false;
   showUserMenu = false;
   pendingPurchase = null;
   purchaseAdvice = null;
@@ -66,5 +67,13 @@ export class UIStore {
 
   closeUserMenu() {
     this.showUserMenu = false;
+  }
+
+  openChatProfileModal() {
+    this.showChatProfileModal = true;
+  }
+
+  closeChatProfileModal() {
+    this.showChatProfileModal = false;
   }
 }

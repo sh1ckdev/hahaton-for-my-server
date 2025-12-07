@@ -18,7 +18,9 @@ const DashboardPage = observer(() => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = useNavigate();
   const userMenuRef = useRef(null);
+  const userMenuButtonRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  const notificationsRef = useRef(null);
 
   useEffect(() => {
     if (!userStore.user && userStore.userId) {
@@ -62,22 +64,35 @@ const DashboardPage = observer(() => {
   // Закрытие меню при клике вне его
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+      // Проверяем, не был ли клик на кнопке пользователя или внутри меню
+      const clickedOnUserButton = userMenuButtonRef.current && userMenuButtonRef.current.contains(event.target);
+      const clickedInsideMenu = userMenuRef.current && userMenuRef.current.contains(event.target);
+      
+      if (uiStore.showUserMenu && !clickedOnUserButton && !clickedInsideMenu) {
         uiStore.closeUserMenu();
       }
+      
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) && !event.target.closest('[data-burger-toggle]')) {
         setMobileMenuOpen(false);
       }
+
+      // Проверяем клик вне панели уведомлений (только на десктопе, на мобильных overlay закрывает)
+      if (showNotifications && notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        const clickedOnBell = event.target.closest('button[type="button"]')?.querySelector('svg') || event.target.closest('button[type="button"]');
+        if (!clickedOnBell) {
+          setShowNotifications(false);
+        }
+      }
     };
 
-    if (uiStore.showUserMenu || mobileMenuOpen) {
+    if (uiStore.showUserMenu || mobileMenuOpen || showNotifications) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [uiStore.showUserMenu, uiStore, mobileMenuOpen]);
+  }, [uiStore.showUserMenu, uiStore, mobileMenuOpen, showNotifications]);
 
   if (!userStore.user) return null;
 
@@ -110,6 +125,7 @@ const DashboardPage = observer(() => {
             </span>
             <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-white/60 hidden sm:block">Добро пожаловать,</div>
             <button
+              ref={userMenuButtonRef}
               onClick={() => uiStore.toggleUserMenu()}
               className="hidden sm:block text-left group min-w-0"
             >
@@ -119,10 +135,6 @@ const DashboardPage = observer(() => {
                 <FiChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform flex-shrink-0 ${uiStore.showUserMenu ? 'rotate-180' : ''}`} />
               </div>
             </button>
-            {/* Имя пользователя на мобильных */}
-            <div className="sm:hidden text-sm font-semibold text-white truncate">
-              {name}
-            </div>
           </div>
         </div>
 
@@ -253,22 +265,41 @@ const DashboardPage = observer(() => {
               )}
             </button>
             {showNotifications && (
-              <div className="absolute right-0 mt-3 w-[calc(100vw-4rem)] sm:w-80 max-w-[calc(100vw-4rem)] sm:max-w-80 bg-[#1A1A1A] border border-[#333333] rounded-md shadow-2xl z-40 overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#333333] flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">
-                    Уведомления
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs text-[#FFDD2D] hover:opacity-80"
-                    onClick={async () => {
-                      await notificationStore.markAllRead(userStore.userId);
-                    }}
-                  >
-                    Отметить прочитанными
-                  </button>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
+              <>
+                {/* Overlay для мобильных */}
+                <div
+                  className="fixed inset-0 bg-black/50 z-40 sm:hidden transition-opacity duration-200"
+                  onClick={() => setShowNotifications(false)}
+                />
+                {/* Панель уведомлений */}
+                <div 
+                  ref={notificationsRef}
+                  className="fixed sm:absolute top-0 sm:top-auto right-0 sm:right-0 mt-0 sm:mt-3 h-screen sm:h-auto w-[85vw] sm:w-80 max-w-[400px] sm:max-w-80 bg-[#1A1A1A] border-l sm:border border-[#333333] sm:rounded-md shadow-2xl z-50 overflow-hidden flex flex-col sm:animate-none notification-panel-mobile"
+                >
+                  <div className="px-4 py-3 border-b border-[#333333] flex items-center justify-between flex-shrink-0">
+                    <span className="text-sm font-semibold text-white">
+                      Уведомления
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-xs text-[#FFDD2D] hover:opacity-80 hidden sm:block"
+                        onClick={async () => {
+                          await notificationStore.markAllRead(userStore.userId);
+                        }}
+                      >
+                        Отметить прочитанными
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotifications(false)}
+                        className="sm:hidden w-8 h-8 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                      >
+                        <FiX className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
                   {notificationStore.notifications.length === 0 ? (
                     <div className="px-4 py-4 text-xs text-white/60">
                       Пока нет уведомлений
@@ -303,8 +334,23 @@ const DashboardPage = observer(() => {
                       </button>
                     ))
                   )}
+                  </div>
+                  {/* Кнопка "Отметить прочитанными" для мобильных внизу */}
+                  {notificationStore.notifications.length > 0 && (
+                    <div className="px-4 py-3 border-t border-[#333333] flex-shrink-0 sm:hidden">
+                      <button
+                        type="button"
+                        className="w-full text-xs text-[#FFDD2D] hover:opacity-80 text-center py-2"
+                        onClick={async () => {
+                          await notificationStore.markAllRead(userStore.userId);
+                        }}
+                      >
+                        Отметить прочитанными
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </>
             )}
           </div>
 

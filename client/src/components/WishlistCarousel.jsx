@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { FiHeart, FiBell, FiBellOff, FiSettings, FiEdit2, FiTrash2, FiX } from "react-icons/fi";
 import { PURCHASE_CATEGORIES } from "../utils/categories.js";
 import api from "../api/client.js";
+import AddToSavingsModal from "./AddToSavingsModal.jsx";
 
 const intervals = [
   { label: "Каждый день", value: 1 },
@@ -17,6 +18,8 @@ const WishlistCarousel = observer(() => {
   const [openId, setOpenId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, openUpward: false });
+  const [showAddToSavingsModal, setShowAddToSavingsModal] = useState(false);
+  const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const menuRef = useRef(null);
   const cardRefs = useRef({});
 
@@ -81,14 +84,37 @@ const WishlistCarousel = observer(() => {
 
   const handleDeletePurchase = async (purchaseId) => {
     if (!confirm("Удалить эту покупку из вишлиста?")) return;
-    try {
-      await api.post(`/purchases/cancel/${purchaseId}`);
-      await purchaseStore.loadForUser(userStore.userId);
+    
+    // Находим покупку перед удалением
+    const purchase = wishlist.find(w => w._id === purchaseId);
+    if (purchase) {
+      // Сохраняем покупку и показываем модальное окно с вопросом о накоплениях
+      setPurchaseToDelete(purchase);
+      setShowAddToSavingsModal(true);
       setEditingId(null);
+    }
+  };
+
+  const handleDeleteAfterSavings = async () => {
+    if (!purchaseToDelete) return;
+    
+    try {
+      await api.post(`/purchases/cancel/${purchaseToDelete._id}`);
+      await purchaseStore.loadForUser(userStore.userId);
     } catch (e) {
       console.error("Failed to delete purchase:", e);
       alert("Ошибка при удалении покупки");
+    } finally {
+      setShowAddToSavingsModal(false);
+      setPurchaseToDelete(null);
     }
+  };
+
+  const handleSkipSavings = () => {
+    // Просто удаляем покупку без добавления в накопления
+    if (!purchaseToDelete) return;
+    
+    handleDeleteAfterSavings();
   };
 
   // Находим открытую покупку для отображения меню
@@ -96,7 +122,7 @@ const WishlistCarousel = observer(() => {
 
   return (
     <>
-      <div ref={menuRef} className="flex flex-col sm:flex-row sm:gap-3 sm:overflow-x-auto pb-1 gap-3">
+      <div ref={menuRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-1">
         {wishlist.map((w) => {
           const cooldown = w.cooldownUntil ? new Date(w.cooldownUntil) : null;
           const comfortable = w.comfortableFrom ? new Date(w.comfortableFrom) : null;
@@ -112,7 +138,7 @@ const WishlistCarousel = observer(() => {
                 if (el) cardRefs.current[w._id] = el;
               }}
               key={w._id}
-              className="w-full sm:min-w-[260px] sm:flex-shrink-0 bg-[#1A1A1A] border border-[#444444] rounded-lg p-2.5 sm:p-3 relative"
+              className="w-full bg-[#1A1A1A] border border-[#444444] rounded-lg p-2.5 sm:p-3 relative"
             >
             <div className="flex justify-between items-start mb-1">
               <div className="flex-1 min-w-0">
@@ -375,6 +401,15 @@ const WishlistCarousel = observer(() => {
           onDelete={() => handleDeletePurchase(purchase._id)}
         />;
       })()}
+
+      {/* Модальное окно с вопросом о добавлении в накопления при удалении */}
+      {showAddToSavingsModal && purchaseToDelete && (
+        <AddToSavingsModal
+          purchase={purchaseToDelete}
+          onClose={handleDeleteAfterSavings}
+          onSkip={handleSkipSavings}
+        />
+      )}
     </>
   );
 });

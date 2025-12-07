@@ -122,7 +122,16 @@ export class PurchaseStore {
 
   // 🔔 подписка на SSE (вебхуки/поток)
   connectBankStream(userId) {
-    const ev = new EventSource(`http://localhost:5000/api/payments/stream/${userId}`);
+    const apiUrl = import.meta.env.VITE_API_URL;
+    
+    if (!apiUrl) {
+      console.error("❌ VITE_API_URL не установлен в переменных окружения!");
+      throw new Error("VITE_API_URL is not configured");
+    }
+    
+    // Убираем /api из конца, так как /payments/stream уже содержит путь
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+    const ev = new EventSource(`${baseUrl}/api/payments/stream/${userId}`);
 
     ev.onmessage = (e) => {
       const data = JSON.parse(e.data);

@@ -10,8 +10,10 @@ import NotificationSettingsPage from "./pages/NotificationSettingsPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import WishlistPage from "./pages/WishlistPage.jsx";
+import PromptsAdminPage from "./pages/PromptsAdminPage.jsx";
 import PaymentConfirmationModal from "./components/PaymentConfirmationModal.jsx";
 import FinancialProfileModal from "./components/FinancialProfileModal.jsx";
+import ChatProfileModal from "./components/ChatProfileModal.jsx";
 
 const App = observer(() => {
   const { userStore, purchaseStore } = useStores();
@@ -92,10 +94,21 @@ const App = observer(() => {
               )
             }
           />
+          <Route
+            path="/admin/prompts"
+            element={
+              userStore.isAuthenticated ? (
+                <PromptsAdminPage />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
         </Routes>
       </div>
       <PaymentConfirmationModal />
       <FinancialProfileModal />
+      <ChatProfileModal />
     </div>
   );
 });

@@ -1,12 +1,15 @@
 import { observer } from "mobx-react-lite";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useStores } from "../stores/StoreProvider.jsx";
-import { FiAlertTriangle, FiX, FiHeart, FiCheck } from "react-icons/fi";
+import { FiAlertTriangle, FiX, FiHeart, FiCheck, FiZap, FiCreditCard, FiXCircle, FiInfo } from "react-icons/fi";
 import { money } from "../utils/formatMoney.js";
 import api from "../api/client.js";
+import AddToSavingsModal from "./AddToSavingsModal.jsx";
 
 const PaymentConfirmationModal = observer(() => {
-  const { uiStore, purchaseStore } = useStores();
+  const { uiStore, purchaseStore, userStore } = useStores();
+  const [showAddToSavingsModal, setShowAddToSavingsModal] = useState(false);
+  const [cancelledPurchase, setCancelledPurchase] = useState(null);
   
   // Запрашиваем AI совет при открытии модального окна (только если не заблокирована)
   useEffect(() => {
@@ -61,11 +64,46 @@ const PaymentConfirmationModal = observer(() => {
   };
 
   const handleClose = () => {
+    // Сохраняем покупку и закрываем основное модальное окно
+    setCancelledPurchase(purchase);
     uiStore.closePaymentConfirmationModal();
+    // Показываем модальное окно с вопросом о добавлении в накопления после закрытия основного
+    setTimeout(() => {
+      setShowAddToSavingsModal(true);
+    }, 100);
+  };
+
+  const handleSkipAddToSavings = async () => {
+    if (cancelledPurchase) {
+      try {
+        // Отменяем покупку на бэкенде
+        await api.post(`/purchases/cancel/${cancelledPurchase._id}`);
+        await purchaseStore.loadForUser(userStore.userId);
+      } catch (err) {
+        console.error("Failed to cancel purchase:", err);
+      }
+    }
+    setShowAddToSavingsModal(false);
+    setCancelledPurchase(null);
+  };
+
+  const handleAddToSavingsComplete = async () => {
+    if (cancelledPurchase) {
+      try {
+        // Отменяем покупку на бэкенде
+        await api.post(`/purchases/cancel/${cancelledPurchase._id}`);
+        await purchaseStore.loadForUser(userStore.userId);
+      } catch (err) {
+        console.error("Failed to cancel purchase:", err);
+      }
+    }
+    setShowAddToSavingsModal(false);
+    setCancelledPurchase(null);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <>
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-[#1A1A1A] via-[#222222] to-[#1A1A1A] border border-[#FFDD2D]/40 rounded-lg p-0 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-hidden relative">
         {/* Декоративный градиент сверху */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-[#FFDD2D]" />
@@ -83,7 +121,7 @@ const PaymentConfirmationModal = observer(() => {
           <div className="flex items-center gap-4 mb-6 pr-12">
             <div className="relative">
               <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#FFDD2D] to-[#FFE855] flex items-center justify-center shadow-lg shadow-[#FFDD2D]/30">
-                <span className="text-2xl">💳</span>
+                <FiCreditCard className="w-7 h-7 text-[#333333]" />
               </div>
               <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 border-2 border-[#1A1A1A] animate-pulse" />
             </div>
@@ -150,7 +188,8 @@ const PaymentConfirmationModal = observer(() => {
                     </div>
                     <div className="flex-1">
                       <div className="text-lg font-extrabold text-red-300 mb-1 flex items-center gap-2">
-                        🚫 ПОКУПКА ЗАБЛОКИРОВАНА
+                        <FiXCircle className="w-5 h-5" />
+                        ПОКУПКА ЗАБЛОКИРОВАНА
                       </div>
                       <div className="text-xs text-white/70">Категория находится в запрещенном списке</div>
                     </div>
@@ -175,7 +214,7 @@ const PaymentConfirmationModal = observer(() => {
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#FFDD2D]/20 to-[#FFDD2D]/10 flex items-center justify-center border border-[#FFDD2D]/30">
-                        <span className="text-3xl animate-pulse">🤖</span>
+                        <FiZap className="w-7 h-7 text-[#FFDD2D] animate-pulse" />
                       </div>
                       <div className="absolute inset-0 rounded-xl border-2 border-[#FFDD2D]/30 animate-ping" />
                     </div>
@@ -205,7 +244,8 @@ const PaymentConfirmationModal = observer(() => {
                       </div>
                       <div className="flex-1">
                         <div className="text-lg font-extrabold text-red-300 mb-1 flex items-center gap-2">
-                          💡 СОВЕТ АССИСТЕНТА
+                          <FiInfo className="w-5 h-5" />
+                          СОВЕТ АССИСТЕНТА
                         </div>
                         <div className="text-xs text-white/70">Финансовый анализ завершен</div>
                       </div>
@@ -300,9 +340,20 @@ const PaymentConfirmationModal = observer(() => {
             </button>
           </div>
         )}
+        </div>
       </div>
-    </div>
-  </div>);
+      </div>
+
+      {/* Модальное окно с вопросом о добавлении в накопления */}
+      {showAddToSavingsModal && cancelledPurchase && (
+        <AddToSavingsModal
+          purchase={cancelledPurchase}
+          onClose={handleAddToSavingsComplete}
+          onSkip={handleSkipAddToSavings}
+        />
+      )}
+    </>
+  );
 });
 
 export default PaymentConfirmationModal;

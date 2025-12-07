@@ -104,6 +104,10 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
         }
       }
 
+      // Рассчитываем сумму отложений из процента
+      const salary = userStore.user?.salary || 0;
+      const calculatedSavingsPerMonth = Math.round((salary * savingsPercentage) / 100);
+
       // Сохраняем данные анкеты в профиль пользователя (БЕЗ financialGoals, так как они уже в целях)
       await api.post(`/users/${userStore.userId}/profile`, {
         extendedProfile: {
@@ -113,7 +117,9 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
           blockingCategories: blockingCategories,
           savingsPercentage: savingsPercentage,
           hasDebts: hasDebts
-        }
+        },
+        // Автоматически рассчитываем и сохраняем сумму отложений
+        savingsPerMonth: calculatedSavingsPerMonth
       });
 
       // Отправляем на генерацию blacklist
@@ -313,6 +319,8 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
         );
 
       case 5:
+        const salary = userStore.user?.salary || 0;
+        const calculatedSavings = Math.round((salary * savingsPercentage) / 100);
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold mb-2 text-white">
@@ -329,11 +337,27 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
               onChange={(e) => setSavingsPercentage(Number(e.target.value))}
               className="w-full"
             />
-            <div className="flex justify-between text-xs text-white/60">
+            <div className="flex justify-between text-xs text-white/60 mb-4">
               <span>0%</span>
               <span>25%</span>
               <span>50%</span>
             </div>
+            {salary > 0 && (
+              <div className="bg-[#1A1A1A] border border-[#333333] rounded-lg p-4">
+                <div className="text-xs text-white/60 mb-1">Будешь откладывать:</div>
+                <div className="text-2xl font-bold text-[#FFDD2D]">
+                  {calculatedSavings.toLocaleString()} ₽/месяц
+                </div>
+                <div className="text-xs text-white/50 mt-1">
+                  из {salary.toLocaleString()} ₽ зарплаты
+                </div>
+              </div>
+            )}
+            {salary === 0 && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 text-sm text-yellow-300">
+                ⚠️ Сначала укажи зарплату в финансовом профиле
+              </div>
+            )}
           </div>
         );
 

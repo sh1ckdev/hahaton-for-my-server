@@ -8,12 +8,115 @@ const LoginPage = observer(() => {
   const nav = useNavigate();
   const [phone, setPhone] = useState("");
   const [nickname, setNickname] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [nicknameError, setNicknameError] = useState("");
+
+  // Функция для форматирования телефона с маской
+  const formatPhone = (value) => {
+    // Удаляем все нецифровые символы
+    const digits = value.replace(/\D/g, "");
+    
+    // Если пусто, возвращаем пустую строку
+    if (digits.length === 0) {
+      return "";
+    }
+    
+    // Если начинается не с 7, добавляем 7 в начало
+    let phoneDigits = digits;
+    if (!phoneDigits.startsWith("7")) {
+      phoneDigits = "7" + phoneDigits;
+    }
+    
+    // Ограничиваем длину до 11 цифр (7XXXXXXXXXX)
+    if (phoneDigits.length > 11) {
+      phoneDigits = phoneDigits.slice(0, 11);
+    }
+    
+    // Форматируем с маской +7 (XXX) XXX-XX-XX
+    const code = phoneDigits.slice(1, 4);
+    const part1 = phoneDigits.slice(4, 7);
+    const part2 = phoneDigits.slice(7, 9);
+    const part3 = phoneDigits.slice(9, 11);
+    
+    let formatted = "+7";
+    if (code) {
+      formatted += ` (${code}`;
+      if (part1) {
+        formatted += `) ${part1}`;
+        if (part2) {
+          formatted += `-${part2}`;
+          if (part3) {
+            formatted += `-${part3}`;
+          }
+        }
+      } else if (code.length === 3) {
+        formatted += ")";
+      }
+    }
+    
+    return formatted;
+  };
+
+  // Валидация телефона
+  const validatePhone = (value) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length === 0) {
+      return "Номер телефона обязателен";
+    }
+    if (cleaned.length < 11 || !cleaned.startsWith("7")) {
+      return "Введите корректный номер телефона (+7XXXXXXXXXX)";
+    }
+    return "";
+  };
+
+  // Валидация ника
+  const validateNickname = (value) => {
+    if (value.trim().length === 0) {
+      return "Никнейм обязателен";
+    }
+    if (/\s/.test(value)) {
+      return "Никнейм не должен содержать пробелы";
+    }
+    return "";
+  };
+
+  const handlePhoneChange = (e) => {
+    const formatted = formatPhone(e.target.value);
+    setPhone(formatted);
+    setPhoneError("");
+  };
+
+  const handleNicknameChange = (e) => {
+    const value = e.target.value;
+    // Удаляем пробелы в реальном времени
+    const trimmedValue = value.replace(/\s/g, "");
+    setNickname(trimmedValue);
+    setNicknameError("");
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!phone) return;
+    
+    const phoneValidation = validatePhone(phone);
+    const nicknameValidation = validateNickname(nickname);
+    
+    if (phoneValidation) {
+      setPhoneError(phoneValidation);
+    }
+    if (nicknameValidation) {
+      setNicknameError(nicknameValidation);
+    }
+    
+    if (phoneValidation || nicknameValidation) {
+      return;
+    }
 
-    userStore.setCredentials(phone, nickname);
+    // Очищаем форматирование перед отправкой (оставляем только цифры с +7)
+    const cleanedPhone = phone.replace(/\D/g, "");
+    // После валидации cleanedPhone всегда начинается с 7
+    const finalPhone = "+" + cleanedPhone;
+
+    userStore.setCredentials(finalPhone, nickname.trim());
     await userStore.loginOrRegister();
     nav("/");
   };
@@ -37,11 +140,21 @@ const LoginPage = observer(() => {
               Номер телефона / ID
             </label>
             <input
-              className="w-full rounded-lg bg-[#1A1A1A] border border-[#555555] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FFDD2D] text-white"
-              placeholder="+7..."
+              type="tel"
+              className={`w-full rounded-lg bg-[#1A1A1A] border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FFDD2D] text-white ${
+                phoneError ? "border-red-500" : "border-[#555555]"
+              }`}
+              placeholder="+7 (999) 123-45-67"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
+              onBlur={() => {
+                const error = validatePhone(phone);
+                setPhoneError(error);
+              }}
             />
+            {phoneError && (
+              <p className="text-red-400 text-xs mt-1">{phoneError}</p>
+            )}
           </div>
 
           <div>
@@ -49,11 +162,21 @@ const LoginPage = observer(() => {
               Никнейм
             </label>
             <input
-              className="w-full rounded-lg bg-[#1A1A1A] border border-[#555555] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FFDD2D] text-white"
+              type="text"
+              className={`w-full rounded-lg bg-[#1A1A1A] border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FFDD2D] text-white ${
+                nicknameError ? "border-red-500" : "border-[#555555]"
+              }`}
               placeholder="Alex"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={handleNicknameChange}
+              onBlur={() => {
+                const error = validateNickname(nickname);
+                setNicknameError(error);
+              }}
             />
+            {nicknameError && (
+              <p className="text-red-400 text-xs mt-1">{nicknameError}</p>
+            )}
           </div>
 
           <button

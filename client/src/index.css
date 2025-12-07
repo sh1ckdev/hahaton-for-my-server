@@ -58,9 +58,45 @@ body {
   @apply border border-[#555555] text-white px-4 py-1.5 rounded-lg hover:bg-[#444444] transition-colors;
 }
 
-/* Кастомный скроллбар */
+/* Глобальный кастомный скроллбар для всего приложения */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #444444 #1A1A1A;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #1A1A1A;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #444444;
+  border-radius: 4px;
+  border: 1px solid #1A1A1A;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: #FFDD2D;
+}
+
+/* Кастомный скроллбар для отдельных элементов (более тонкий) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #444444 #1A1A1A;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -75,4 +111,22 @@ body {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #555555;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #FFDD2D;
+}
+
+/* Анимация для панели уведомлений на мобильных */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.notification-panel-mobile {
+  animation: slideInFromRight 0.3s ease-out;
 }

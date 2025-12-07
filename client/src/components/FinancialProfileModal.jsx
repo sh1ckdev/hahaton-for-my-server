@@ -6,7 +6,6 @@ import api from "../api/client";
 const FinancialProfileModal = observer(() => {
   const { userStore, uiStore } = useStores();
   const [salary, setSalary] = useState(userStore.user?.salary || "");
-  const [savingsPerMonth, setSavingsPerMonth] = useState(userStore.user?.savingsPerMonth || "");
   const [loading, setLoading] = useState(false);
 
   // Условный return ПОСЛЕ всех хуков
@@ -16,8 +15,8 @@ const FinancialProfileModal = observer(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!salary || !savingsPerMonth) {
-      alert("Пожалуйста, заполните все поля");
+    if (!salary) {
+      alert("Пожалуйста, укажите зарплату");
       return;
     }
 
@@ -25,8 +24,8 @@ const FinancialProfileModal = observer(() => {
     try {
       await api.post(`/users/${userStore.userId}/profile`, {
         salary: Number(salary),
-        savingsPerMonth: Number(savingsPerMonth),
         currentSavings: userStore.user?.currentSavings || 0
+        // savingsPerMonth будет рассчитан автоматически в расширенной анкете
       });
       
       // Обновляем данные пользователя
@@ -78,24 +77,6 @@ const FinancialProfileModal = observer(() => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm mb-2 text-white/90">
-              Сколько откладываете в месяц (₽)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              className="w-full rounded-lg bg-[#1A1A1A] border border-[#555555] px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#FFDD2D] text-white"
-              placeholder="10000"
-              value={savingsPerMonth}
-              onChange={(e) => setSavingsPerMonth(e.target.value)}
-              required
-            />
-            <p className="text-xs text-white/60 mt-1">
-              Сумма, которую вы планируете откладывать каждый месяц
-            </p>
-          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <button

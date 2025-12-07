@@ -1,7 +1,9 @@
 import { observer } from "mobx-react-lite";
 import { useStores } from "../stores/StoreProvider.jsx";
 import { useState, useEffect } from "react";
+import { FiFileText, FiZap, FiList, FiLoader } from "react-icons/fi";
 import ExtendedProfileModal from "./ExtendedProfileModal";
+import ChatProfileModal from "./ChatProfileModal";
 
 // если AI не ответит — дефолт
 const FALLBACK_CATEGORIES = [
@@ -13,6 +15,7 @@ const InitialBlacklistModal = observer(() => {
   
   // ВСЕ хуки должны быть ДО условных return
   const [showExtendedProfile, setShowExtendedProfile] = useState(false);
+  const [showProfileChoice, setShowProfileChoice] = useState(false);
   const [categories, setCategories] = useState([]);   // список категории
   const [selected, setSelected] = useState([]);       // выбранные пользователем
   const [loading, setLoading] = useState(true);
@@ -26,15 +29,16 @@ const InitialBlacklistModal = observer(() => {
       setSelected(existing);
       setLoading(false);
       setUseExtendedProfile(false);
+      setShowProfileChoice(false);
       return;
     }
 
-    // Если расширенная анкета еще не пройдена, показываем её
-    if (useExtendedProfile) {
-      setShowExtendedProfile(true);
+    // Если расширенная анкета еще не пройдена, показываем выбор способа заполнения
+    if (useExtendedProfile && !showExtendedProfile) {
+      setShowProfileChoice(true);
       setLoading(false);
     }
-  }, [userStore.user, useExtendedProfile]);
+  }, [userStore.user, useExtendedProfile, showExtendedProfile]);
 
   const toggle = (cat) => {
     setSelected((prev) =>
@@ -50,9 +54,42 @@ const InitialBlacklistModal = observer(() => {
       setCategories(existing);
       setSelected(existing);
       setShowExtendedProfile(false);
+      setShowProfileChoice(false);
       setUseExtendedProfile(false);
     }
   };
+
+  // Отслеживаем закрытие чат-бота и обновляем категории
+  useEffect(() => {
+    if (!uiStore.showChatProfileModal && showProfileChoice) {
+      // Чат-бот закрыт, загружаем категории
+      const existing = userStore.user?.notificationSettings?.excludeCategories;
+      if (existing && existing.length > 0) {
+        setCategories(existing);
+        setSelected(existing);
+        setShowProfileChoice(false);
+        setUseExtendedProfile(false);
+      }
+    }
+  }, [uiStore.showChatProfileModal, showProfileChoice, userStore.user]);
+
+  // Запрещаем закрытие по ESC в модальном окне выбора способа заполнения и blacklist
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape" && (showProfileChoice || uiStore.showInitialBlacklistModal)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    if (showProfileChoice || uiStore.showInitialBlacklistModal) {
+      document.addEventListener("keydown", handleEscape, true);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape, true);
+    };
+  }, [showProfileChoice, uiStore.showInitialBlacklistModal]);
 
   const save = async () => {
     await userStore.updateBlacklist(selected);
@@ -63,6 +100,69 @@ const InitialBlacklistModal = observer(() => {
   // Условные return ПОСЛЕ всех хуков
   if (!uiStore.showInitialBlacklistModal || !userStore.user?.isFirstLogin) {
     return null;
+  }
+
+  // Показываем выбор способа заполнения профиля
+  if (showProfileChoice) {
+    return (
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="bg-gradient-to-br from-[#1A1A1A] via-[#222222] to-[#1A1A1A] border border-[#FFDD2D]/40 rounded-lg p-6 max-w-md w-full shadow-2xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#FFDD2D] to-[#FFE855] flex items-center justify-center shadow-lg shadow-[#FFDD2D]/30">
+              <FiFileText className="w-6 h-6 text-[#333333]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Заполнение профиля</h2>
+              <p className="text-sm text-white/60">Выбери удобный способ</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            <button
+              onClick={() => {
+                uiStore.openChatProfileModal();
+                setShowProfileChoice(false);
+              }}
+              className="w-full p-4 bg-[#333333]/50 border border-[#555555]/50 rounded-lg hover:border-[#FFDD2D]/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FFDD2D]/20 to-[#FFDD2D]/10 flex items-center justify-center border border-[#FFDD2D]/30 group-hover:border-[#FFDD2D] transition-colors">
+                  <FiZap className="w-5 h-5 text-[#FFDD2D]" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-white">Чат-бот</div>
+                  <div className="text-xs text-white/60">Просто расскажи о себе</div>
+                </div>
+              </div>
+              <p className="text-sm text-white/70">
+                Напиши всё в свободной форме, а AI заполнит анкету автоматически
+              </p>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowExtendedProfile(true);
+                setShowProfileChoice(false);
+              }}
+              className="w-full p-4 bg-[#333333]/50 border border-[#555555]/50 rounded-lg hover:border-[#FFDD2D]/50 transition-all text-left group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FFDD2D]/20 to-[#FFDD2D]/10 flex items-center justify-center border border-[#FFDD2D]/30 group-hover:border-[#FFDD2D] transition-colors">
+                  <FiList className="w-5 h-5 text-[#FFDD2D]" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-white">Форма</div>
+                  <div className="text-xs text-white/60">Пошаговое заполнение</div>
+                </div>
+              </div>
+              <p className="text-sm text-white/70">
+                Заполни анкету по шагам, выбирая из предложенных вариантов
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Показываем расширенную анкету, если нужно
@@ -79,12 +179,15 @@ const InitialBlacklistModal = observer(() => {
         </h2>
         <p className="text-sm text-white/70 mb-4">
           Выбери категории, на которые ты хочешь тратить меньше.
-          Я буду напоминать тебе о целях и охлаждать импульсивные решения 💛
+          Я буду напоминать тебе о целях и охлаждать импульсивные решения
         </p>
 
         {loading && (
           <div className="text-center text-white/60 py-6">
-            🤖 Генерирую категории через AI...
+            <div className="flex items-center justify-center gap-2">
+              <FiLoader className="w-5 h-5 animate-spin" />
+              <span>Генерирую категории через AI...</span>
+            </div>
           </div>
         )}
 
@@ -112,12 +215,6 @@ const InitialBlacklistModal = observer(() => {
         )}
 
         <div className="flex justify-end gap-2">
-          <button
-            onClick={() => uiStore.closeInitialBlacklistModal()}
-            className="px-3 py-1 rounded-lg text-sm bg-[#1A1A1A] text-white/80 hover:bg-[#444444] transition-colors"
-          >
-            Потом
-          </button>
           <button
             onClick={save}
             disabled={loading}
