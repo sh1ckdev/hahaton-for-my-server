@@ -27,33 +27,37 @@ const AddPurchaseModal = observer(({ onClose }) => {
 
     setLoading(true);
     try {
-      // Создаем покупку
+      // Создаем покупку (увеличиваем таймаут для AI-классификации категории)
       const response = await api.post(`/purchases/${userStore.userId}`, {
         title,
         price: Number(price),
         category: category || undefined,
         url: url || undefined,
         useAiCategory: ai && !category
+      }, {
+        timeout: 30000 // 30 секунд для AI-классификации
       });
 
       const purchase = response.data;
       setCreatedPurchase(purchase);
 
-      // Если покупка не заблокирована, получаем совет ассистента
+      // Если покупка не заблокирована, показываем совет ассистента (приходит в ответе)
       if (purchase.status === "planned" && !purchase.blockedByCategory) {
-        try {
-          const adviceResponse = await api.get(`/ai/purchase-advice/${purchase._id}`);
-          setAdvice(adviceResponse.data.advice || "Покупка добавлена в список запланированных.");
+        if (purchase.advice) {
+          setAdvice(purchase.advice);
           setShowAdvice(true);
-        } catch (e) {
-          console.error("Error getting advice:", e);
-          // Показываем модалку даже без совета
+        } else {
+          // Если совет не пришел, показываем стандартное сообщение
           setAdvice("Покупка добавлена. Хотите добавить её в вишлист?");
           setShowAdvice(true);
         }
       } else if (purchase.blockedByCategory) {
         // Если заблокирована - показываем сообщение
-        setAdvice(`Я определил, что покупка "${purchase.title}" за ${money(purchase.price)} относится к категории "${purchase.category || purchase.aiCategory}", которая находится в вашем blacklist.`);
+        if (purchase.advice) {
+          setAdvice(purchase.advice);
+        } else {
+          setAdvice(`Я определил, что покупка "${purchase.title}" за ${money(purchase.price)} относится к категории "${purchase.category || purchase.aiCategory}", которая находится в вашем blacklist.`);
+        }
         setShowAdvice(true);
       } else {
         // Если сразу куплена или отменена

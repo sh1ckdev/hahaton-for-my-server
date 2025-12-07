@@ -17,6 +17,8 @@ const AddPurchasePage = observer(() => {
       title,
       price: Number(price),
       useAiCategory: useAI
+    }, {
+      timeout: 30000 // 30 секунд для AI-классификации
     });
 
     await purchaseStore.loadForUser(userStore.userId);
