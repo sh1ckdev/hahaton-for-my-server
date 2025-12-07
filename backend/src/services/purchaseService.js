@@ -135,8 +135,36 @@ export const createPurchase = async (user, payload) => {
 export const cancelPurchase = async (id) => {
   const purchase = await Purchase.findById(id);
   if (!purchase) return null;
+  
+  // Помечаем покупку как отмененную
   purchase.status = "canceled";
   await purchase.save();
+  
+  // Удаляем все уведомления, связанные с этой покупкой
+  // Уведомления могут содержать один ID покупки или несколько через запятую
+  const Notification = (await import("../models/Notification.js")).default;
+  const purchaseIdStr = purchase._id.toString();
+  
+  // Находим все уведомления пользователя для проверки
+  const userNotifications = await Notification.find({
+    userId: purchase.userId
+  });
+  
+  // Фильтруем уведомления, которые содержат ID отмененной покупки
+  const notificationsToDelete = userNotifications.filter(notif => {
+    const purchaseIds = notif.purchaseId.split(',').map(id => id.trim());
+    return purchaseIds.includes(purchaseIdStr);
+  });
+  
+  // Удаляем найденные уведомления
+  if (notificationsToDelete.length > 0) {
+    const idsToDelete = notificationsToDelete.map(n => n._id);
+    await Notification.deleteMany({
+      _id: { $in: idsToDelete }
+    });
+    console.log(`[PURCHASE] ✅ Deleted ${notificationsToDelete.length} notification(s) for canceled purchase ${id}`);
+  }
+  
   return purchase;
 };
 

@@ -40,7 +40,7 @@ export const checkAndCreateNotifications = async () => {
 
     const query = {
       userId: user.userId,
-      status: "planned",
+      status: "planned", // Только запланированные покупки (не отмененные и не купленные)
       blockedByCategory: { $ne: true },
       category: { $nin: excludeCategories || [] }
     };

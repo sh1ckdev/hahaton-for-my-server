@@ -171,6 +171,15 @@ export const parseProfileController = async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error("Error parsing profile:", e);
-    res.status(500).json({ error: "Failed to parse profile" });
+    console.error("Error details:", {
+      message: e.message,
+      stack: e.stack,
+      userId: req.body?.userId,
+      messageLength: req.body?.message?.length
+    });
+    res.status(500).json({ 
+      error: "Failed to parse profile",
+      details: process.env.NODE_ENV === "development" ? e.message : undefined
+    });
   }
 };
