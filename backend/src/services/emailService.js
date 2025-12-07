@@ -63,10 +63,16 @@ export const sendEmail = async (to, subject, text, html = null) => {
  * Отправка уведомления о покупке в вишлисте
  * @param {string} email - Email получателя
  * @param {Object} purchase - Объект покупки
+ * @param {string} customMessage - Опциональное кастомное сообщение (для объединенных уведомлений)
  * @returns {Promise<boolean>}
  */
-export const sendPurchaseNotification = async (email, purchase) => {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+export const sendPurchaseNotification = async (email, purchase, customMessage = null) => {
+  const frontendUrl = process.env.FRONTEND_URL;
+  
+  if (!frontendUrl) {
+    console.error("❌ FRONTEND_URL не установлен в переменных окружения!");
+    throw new Error("FRONTEND_URL is not configured");
+  }
   const cleanUrl = frontendUrl.replace(/\/+$/, ''); // Убираем trailing slash
   const wishlistUrl = `${cleanUrl}/wishlist`;
   
@@ -74,7 +80,7 @@ export const sendPurchaseNotification = async (email, purchase) => {
   console.log(`[EMAIL] 🔗 Wishlist URL: ${wishlistUrl}`);
   
   const subject = "Напоминание о покупке из вишлиста";
-  const text = `Ты всё ещё хочешь купить "${purchase.title}" за ${purchase.price}₽?\n\nОткрой вишлист: ${wishlistUrl}${purchase.url ? `\nПерейти к товару: ${purchase.url}` : ''}`;
+  const text = customMessage || `Ты всё ещё хочешь купить "${purchase.title}" за ${purchase.price}₽?\n\nОткрой вишлист: ${wishlistUrl}${purchase.url ? `\nПерейти к товару: ${purchase.url}` : ''}`;
   
   const html = `
 <!DOCTYPE html>

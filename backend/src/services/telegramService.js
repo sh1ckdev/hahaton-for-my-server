@@ -59,10 +59,16 @@ export const sendTelegramMessage = async (chatId, message, options = {}) => {
  * Отправка уведомления о покупке в вишлисте
  * @param {string} chatId - ID чата или username получателя
  * @param {Object} purchase - Объект покупки
+ * @param {string} customMessage - Опциональное кастомное сообщение (для объединенных уведомлений)
  * @returns {Promise<boolean>}
  */
-export const sendPurchaseNotification = async (chatId, purchase) => {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+export const sendPurchaseNotification = async (chatId, purchase, customMessage = null) => {
+  const frontendUrl = process.env.FRONTEND_URL;
+  
+  if (!frontendUrl) {
+    console.error("❌ FRONTEND_URL не установлен в переменных окружения!");
+    throw new Error("FRONTEND_URL is not configured");
+  }
   // Убираем trailing slash если есть
   const cleanUrl = frontendUrl.replace(/\/+$/, '');
   const wishlistUrl = `${cleanUrl}/wishlist`;
@@ -80,55 +86,62 @@ export const sendPurchaseNotification = async (chatId, purchase) => {
   
   console.log(`[TELEGRAM] 🔍 isLocalhost: ${isLocalhost}, isValidTelegramUrl: ${isValidTelegramUrl}, canUseButton: ${canUseButton}`);
   
-  let message = `🔔 <b>Напоминание о покупке</b>\n\n` +
-    `Ты всё ещё хочешь купить <b>"${purchase.title}"</b> за <b>${purchase.price.toLocaleString('ru-RU')}₽</b>?\n\n`;
-  
-  // Если localhost или невалидный URL, добавляем ссылку в текст сообщения
-  if (isLocalhost || !canUseButton) {
-    message += `📋 Открой вишлист: <a href="${wishlistUrl}">${wishlistUrl}</a>\n\n`;
-  }
-  
-  // Если есть URL товара
-  if (purchase.url) {
-    const isProductUrlValid = purchase.url.startsWith('http://') || purchase.url.startsWith('https://');
-    if (isProductUrlValid) {
-      if (canUseButton) {
-        message += `🛒 <a href="${purchase.url}">Перейти к товару</a>`;
-      } else {
-        message += `🛒 Товар: <a href="${purchase.url}">${purchase.url}</a>`;
-      }
-    } else {
-      message += `🛒 Товар: ${purchase.url}`;
-    }
-  }
-  
-  // Кнопки через inline keyboard только если URL валидный
+  let message;
   let options = {};
   
-  if (canUseButton) {
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          {
-            text: "📋 Открыть вишлист",
-            url: wishlistUrl
-          }
-        ]
-      ]
-    };
-    
-    // Добавляем кнопку товара если есть и она валидна
-    if (purchase.url && (purchase.url.startsWith('http://') || purchase.url.startsWith('https://'))) {
-      replyMarkup.inline_keyboard[0].push({
-        text: "🛒 Перейти к товару",
-        url: purchase.url
-      });
+  if (customMessage) {
+    // Используем кастомное сообщение для объединенных уведомлений
+    message = `🔔 <b>Напоминание о покупках</b>\n\n${customMessage}\n\n📋 Открой вишлист: <a href="${wishlistUrl}">${wishlistUrl}</a>`;
+  } else {
+    // Обычное сообщение для одной покупки
+    message = `🔔 <b>Напоминание о покупке</b>\n\n` +
+      `Ты всё ещё хочешь купить <b>"${purchase.title}"</b> за <b>${purchase.price.toLocaleString('ru-RU')}₽</b>?\n\n`;
+  
+    // Если localhost или невалидный URL, добавляем ссылку в текст сообщения
+    if (isLocalhost || !canUseButton) {
+      message += `📋 Открой вишлист: <a href="${wishlistUrl}">${wishlistUrl}</a>\n\n`;
     }
     
-    console.log(`[TELEGRAM] ⌨️ Creating inline keyboard:`, JSON.stringify(replyMarkup, null, 2));
-    options.reply_markup = replyMarkup;
-  } else {
-    console.log(`[TELEGRAM] ⚠️ Skipping inline keyboard (localhost or invalid URL)`);
+    // Если есть URL товара
+    if (purchase.url) {
+      const isProductUrlValid = purchase.url.startsWith('http://') || purchase.url.startsWith('https://');
+      if (isProductUrlValid) {
+        if (canUseButton) {
+          message += `🛒 <a href="${purchase.url}">Перейти к товару</a>`;
+        } else {
+          message += `🛒 Товар: <a href="${purchase.url}">${purchase.url}</a>`;
+        }
+      } else {
+        message += `🛒 Товар: ${purchase.url}`;
+      }
+    }
+    
+    // Кнопки через inline keyboard только если URL валидный
+    if (canUseButton) {
+      const replyMarkup = {
+        inline_keyboard: [
+          [
+            {
+              text: "📋 Открыть вишлист",
+              url: wishlistUrl
+            }
+          ]
+        ]
+      };
+      
+      // Добавляем кнопку товара если есть и она валидна
+      if (purchase.url && (purchase.url.startsWith('http://') || purchase.url.startsWith('https://'))) {
+        replyMarkup.inline_keyboard[0].push({
+          text: "🛒 Перейти к товару",
+          url: purchase.url
+        });
+      }
+      
+      console.log(`[TELEGRAM] ⌨️ Creating inline keyboard:`, JSON.stringify(replyMarkup, null, 2));
+      options.reply_markup = replyMarkup;
+    } else {
+      console.log(`[TELEGRAM] ⚠️ Skipping inline keyboard (localhost or invalid URL)`);
+    }
   }
   
   return await sendTelegramMessage(chatId, message, options);
@@ -157,4 +170,3 @@ export const getBotInfo = async () => {
     return null;
   }
 };
-

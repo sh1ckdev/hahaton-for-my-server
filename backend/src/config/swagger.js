@@ -1,5 +1,16 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+const apiUrl = process.env.API_URL;
+
+const servers = apiUrl 
+  ? [
+      {
+        url: apiUrl,
+        description: "API server",
+      },
+    ]
+  : [];
+
 const options = {
   definition: {
     openapi: "3.0.0",
@@ -8,12 +19,7 @@ const options = {
       version: "1.0.0",
       description: "API для финансового ассистента - управления покупками, настройками уведомлений и правил охлаждения",
     },
-    servers: [
-      {
-        url: process.env.API_URL || "http://localhost:5000",
-        description: "Development server",
-      },
-    ],
+    servers: servers,
   },
   apis: ["./src/routes/*.js", "./src/controllers/*.js"], // пути к файлам с аннотациями
 };

@@ -70,24 +70,41 @@ export const calculateGoalsImpact = async (user, purchase) => {
   const goals = await listGoalsByUser(user.userId, false);
   
   const goalsWithShift = goals.map(goal => {
-    // Накопления после покупки
-    const newSavings = user.currentSavings - purchase.price;
+    const currentSavings = user.currentSavings || 0;
+    const dailySavings = user.savingsPerMonth / 30;
     
-    // Если накопления отрицательные, нужно сначала их восстановить, потом накопить на цель
-    let totalNeeded = goal.price;
-    if (newSavings < 0) {
-      // Сначала нужно вернуть долг, потом накопить на цель
-      totalNeeded = Math.abs(newSavings) + goal.price;
+    // Рассчитываем, через сколько дней можно достичь цели БЕЗ покупки
+    let daysWithoutPurchase = null;
+    if (currentSavings >= goal.price) {
+      // Если накоплений уже достаточно для цели, то цель достижима сразу
+      daysWithoutPurchase = 0;
     } else {
-      // Если накопления положительные, считаем дефицит
-      totalNeeded = Math.max(0, goal.price - newSavings);
+      // Сколько нужно накопить до цели
+      const deficit = goal.price - currentSavings;
+      daysWithoutPurchase = Math.ceil(deficit / dailySavings);
     }
     
+    // Рассчитываем, через сколько дней можно достичь цели С покупкой
+    const newSavings = currentSavings - purchase.price;
+    let daysWithPurchase = null;
+    
+    if (newSavings >= goal.price) {
+      // Если даже после покупки накоплений достаточно для цели, цель не сдвигается
+      daysWithPurchase = 0;
+    } else if (newSavings < 0) {
+      // Если накопления стали отрицательными, нужно сначала восстановить их, потом накопить на цель
+      const totalNeeded = Math.abs(newSavings) + goal.price;
+      daysWithPurchase = Math.ceil(totalNeeded / dailySavings);
+    } else {
+      // Если накопления положительные, но недостаточны для цели
+      const deficit = goal.price - newSavings;
+      daysWithPurchase = Math.ceil(deficit / dailySavings);
+    }
+    
+    // Сдвиг = разница между днями с покупкой и без покупки
     let shiftDays = null;
-    if (totalNeeded > 0 && user.savingsPerMonth > 0) {
-      // Рассчитываем дни: сколько нужно накопить / сколько накапливаем в день
-      const dailySavings = user.savingsPerMonth / 30;
-      shiftDays = Math.ceil(totalNeeded / dailySavings);
+    if (daysWithoutPurchase !== null && daysWithPurchase !== null) {
+      shiftDays = Math.max(0, daysWithPurchase - daysWithoutPurchase);
     }
     
     return {

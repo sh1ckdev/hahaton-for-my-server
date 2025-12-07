@@ -55,10 +55,14 @@ export const checkAndCreateNotifications = async () => {
     
     if (purchases.length === 0) {
       console.log(`[NOTIFY] ⚠️ No purchases found for user ${user.userId}`);
+      continue;
     } else {
       console.log(`[NOTIFY] 🔍 Found ${purchases.length} purchases for user ${user.userId}`);
     }
 
+    // Собираем покупки, которые нужно уведомить
+    const purchasesToNotify = [];
+    
     for (const p of purchases) {
       // 🔕 Индивидуальное исключение: если пользователь явно отключил уведомления для этой покупки
       // null/undefined = применяем глобальные настройки (по умолчанию)
@@ -120,16 +124,39 @@ export const checkAndCreateNotifications = async () => {
         console.log(`[NOTIFY] ⚠️ WARNING: Purchase "${p.title}" cooldown not passed (until ${p.cooldownUntil}), but creating notification anyway for testing`);
       }
 
-      const message = `Ты всё ещё хочешь купить "${p.title}" за ${p.price}?`;
+      // Добавляем покупку в список для уведомления
+      purchasesToNotify.push(p);
+    }
 
+    // Если есть покупки для уведомления, создаем объединенное уведомление
+    if (purchasesToNotify.length > 0) {
+      // Формируем объединенное сообщение
+      let message;
+      if (purchasesToNotify.length === 1) {
+        // Если одна покупка - простое сообщение
+        const p = purchasesToNotify[0];
+        message = `Ты всё ещё хочешь купить "${p.title}" за ${p.price}₽?`;
+      } else {
+        // Если несколько покупок - объединенное сообщение
+        const purchasesList = purchasesToNotify.map((p, idx) => 
+          `${idx + 1}. "${p.title}" за ${p.price}₽`
+        ).join('\n');
+        message = `Ты всё ещё хочешь купить эти товары?\n\n${purchasesList}\n\nПожалуйста, подумай о необходимости каждой покупки.`;
+      }
+
+      // Создаем одно объединенное уведомление для всех покупок
+      const purchaseIds = purchasesToNotify.map(p => p._id.toString());
       const notification = await Notification.create({
         userId: user.userId,
-        purchaseId: p._id.toString(),
+        purchaseId: purchaseIds.join(','), // Сохраняем все ID через запятую
         message
       });
 
-      p.lastNotifiedAt = current;
-      await p.save();
+      // Обновляем lastNotifiedAt для всех покупок
+      for (const p of purchasesToNotify) {
+        p.lastNotifiedAt = current;
+        await p.save();
+      }
 
       // Отправка уведомлений через включенные каналы
       const emailSettings = settings.emailSettings || {};
@@ -138,7 +165,19 @@ export const checkAndCreateNotifications = async () => {
       // Отправка в Email
       if (activeChannels.includes("email") && emailSettings.enabled && emailSettings.email) {
         try {
-          await sendEmailNotification(emailSettings.email, p);
+          // Отправляем объединенное уведомление
+          const frontendUrl = process.env.FRONTEND_URL;
+          
+          if (!frontendUrl) {
+            console.error("❌ FRONTEND_URL не установлен в переменных окружения!");
+            throw new Error("FRONTEND_URL is not configured");
+          }
+          const cleanUrl = frontendUrl.replace(/\/+$/, '');
+          const wishlistUrl = `${cleanUrl}/wishlist`;
+          const emailMessage = purchasesToNotify.length === 1 
+            ? message 
+            : `${message}\n\nОткрой вишлист: ${wishlistUrl}`;
+          await sendEmailNotification(emailSettings.email, purchasesToNotify[0], emailMessage);
         } catch (error) {
           console.error(`[NOTIFY] ❌ Failed to send email notification:`, error.message);
         }
@@ -147,13 +186,13 @@ export const checkAndCreateNotifications = async () => {
       // Отправка в Telegram
       if (activeChannels.includes("telegram") && telegramSettings.enabled && telegramSettings.chatId) {
         try {
-          await sendTelegramNotification(telegramSettings.chatId, p);
+          await sendTelegramNotification(telegramSettings.chatId, purchasesToNotify[0], message);
         } catch (error) {
           console.error(`[NOTIFY] ❌ Failed to send telegram notification:`, error.message);
         }
       }
 
-      console.log(`[NOTIFY] ✅ Created notification for user=${user.userId}, purchase="${p.title}" (${p._id}), notificationId=${notification._id}`);
+      console.log(`[NOTIFY] ✅ Created combined notification for user=${user.userId}, purchases=${purchasesToNotify.length}, notificationId=${notification._id}`);
     }
   }
 };

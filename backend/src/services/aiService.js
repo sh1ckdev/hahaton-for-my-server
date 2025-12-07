@@ -1,4 +1,5 @@
 import { callOpenRouter, isOpenRouterAvailable } from "./openRouterService.js";
+import { renderPrompt, getPromptByKey } from "./promptService.js";
 
 // Кэш для результатов (чтобы не запрашивать одно и то же)
 const categoryCache = new Map();
@@ -76,7 +77,15 @@ export const generateBlacklist = async (contextText = "") => {
     return ["игры", "подписки", "фастфуд", "шмот", "онлайн покупки", "развлечения"];
   }
 
-  const prompt = `
+  // Пытаемся загрузить промпт из БД, если не найден - используем дефолтный
+  let prompt;
+  try {
+    prompt = await renderPrompt("generateBlacklist", { contextText });
+    console.log("✅ Using prompt from DB: generateBlacklist");
+  } catch (error) {
+    console.log("⚠ Prompt not found in DB, using default:", error.message);
+    // Fallback на дефолтный промпт
+    prompt = `
   Ты финансовый ассистент. Твоя задача — определить категории расходов пользователя, которые стоит ограничить для улучшения бюджета.
   
   === ДАННЫЕ О ПОЛЬЗОВАТЕЛЕ ===
@@ -131,8 +140,8 @@ export const generateBlacklist = async (contextText = "") => {
   6. Ответ строго в формате JSON массива строк, без пояснений и текста до/после.
   
   === ОТВЕТ (строго JSON) ===
-  `
-  
+  `;
+  }
 
   try {
     const completion = await callOpenRouterWithRetry(prompt);
@@ -177,29 +186,43 @@ export const classifyCategory = async (title = "", description = "", excludeCate
     // Объединяем базовые категории с запрещенными категориями пользователя
     const allCategories = [...new Set([...baseCategories, ...excludeCategories])];
     
-    let prompt = `Определи категорию покупки по названию и описанию: "${text}"\n\n`;
-    
-    // Добавляем подсказки для распознавания азартных игр
-    prompt += `ВАЖНО: Распознавание азартных игр:\n`;
-    prompt += `- "казик", "казино", "деп в казино", "ставки", "бет", "рулетка", "покер", "слоты" → категория "азарт" или "казино"\n`;
-    prompt += `- "игры" относится к видеоиграм (PlayStation, Xbox, Steam и т.д.)\n\n`;
-    
+    // Формируем секцию для запрещенных категорий
+    let excludeCategoriesSection = "";
     if (excludeCategories.length > 0) {
-      prompt += `КРИТИЧЕСКИ ВАЖНО: У пользователя есть список запрещенных категорий, которые он контролирует:\n${excludeCategories.map(cat => `- "${cat}"`).join('\n')}\n\n`;
-      prompt += `ПРАВИЛА КЛАССИФИКАЦИИ:\n`;
-      prompt += `1. Если покупка относится к одной из запрещенных категорий (даже частично) - ОБЯЗАТЕЛЬНО верни ТОЧНОЕ название этой категории из списка выше.\n`;
-      prompt += `2. Например, если в запрещенных есть "пицца" или "фастфуд", а покупка - "пицца пепперони", верни "пицца" (если это точное совпадение) или соответствующую запрещенную категорию.\n`;
-      prompt += `3. Если покупка не относится к запрещенным категориям, выбери из базовых категорий.\n\n`;
+      excludeCategoriesSection = `КРИТИЧЕСКИ ВАЖНО: У пользователя есть список запрещенных категорий, которые он контролирует:\n${excludeCategories.map(cat => `- "${cat}"`).join('\n')}\n\nПРАВИЛА КЛАССИФИКАЦИИ:\n1. Если покупка относится к одной из запрещенных категорий (даже частично) - ОБЯЗАТЕЛЬНО верни ТОЧНОЕ название этой категории из списка выше.\n2. Например, если в запрещенных есть "пицца" или "фастфуд", а покупка - "пицца пепперони", верни "пицца" (если это точное совпадение) или соответствующую запрещенную категорию.\n3. Если покупка не относится к запрещенным категориям, выбери из базовых категорий.\n\n`;
     }
     
-    prompt += `Доступные категории для выбора:\n`;
+    // Формируем список доступных категорий
+    let availableCategories = "";
     if (excludeCategories.length > 0) {
-      prompt += `Запрещенные (приоритет): ${excludeCategories.join(', ')}\n`;
-      prompt += `Базовые: ${baseCategories.join(', ')}\n`;
+      availableCategories = `Запрещенные (приоритет): ${excludeCategories.join(', ')}\nБазовые: ${baseCategories.join(', ')}`;
     } else {
-      prompt += `${allCategories.join(', ')}\n`;
+      availableCategories = allCategories.join(', ');
     }
-    prompt += `\nВерни ТОЛЬКО одно слово - название категории из списка выше, без дополнительных пояснений.`;
+    
+    // Пытаемся загрузить промпт из БД
+    let prompt;
+    try {
+      prompt = await renderPrompt("classifyCategory", {
+        text,
+        excludeCategoriesSection,
+        availableCategories
+      });
+      console.log("✅ Using prompt from DB: classifyCategory");
+    } catch (error) {
+      console.log("⚠ Prompt not found in DB, using default:", error.message);
+      // Fallback на дефолтный промпт
+      prompt = `Определи категорию покупки по названию и описанию: "${text}"
+
+ВАЖНО: Распознавание азартных игр:
+- "казик", "казино", "деп в казино", "ставки", "бет", "рулетка", "покер", "слоты" → категория "азарт" или "казино"
+- "игры" относится к видеоиграм (PlayStation, Xbox, Steam и т.д.)
+
+${excludeCategoriesSection}Доступные категории для выбора:
+${availableCategories}
+
+Верни ТОЛЬКО одно слово - название категории из списка выше, без дополнительных пояснений.`;
+    }
 
     console.log(`📤 Requesting AI classification for: "${text.substring(0, 100)}..." ${excludeCategories.length > 0 ? `(with ${excludeCategories.length} excluded categories)` : ''}`);
 
@@ -257,6 +280,33 @@ export const classifyCategory = async (title = "", description = "", excludeCate
 // Генерация AI совета для подтверждения покупки
 // goalsWithShift - массив целей с информацией о сдвиге: [{title, price, shiftDays}, ...]
 export const generatePurchaseConfirmationAdvice = async (user, purchase, goalsWithShift = []) => {
+  // Если категория в черном списке - явно рекомендуем не покупать и заканчиваем сценарий
+  if (purchase.blockedByCategory || purchase.blacklistMatched) {
+    const category = purchase.aiCategory || purchase.category || "";
+    const matchedCategory = purchase.matchedBlacklistCategory || "";
+    const explanation = purchase.similarityExplanation || "";
+    const similarityScore = purchase.similarityScore;
+    
+    let message = `СТОП! Я НЕ РЕКОМЕНДУЮ совершать эту покупку.\n\n`;
+    message += `Покупка "${purchase.title}" за ${purchase.price}₽ относится к категории "${category}"`;
+    
+    if (matchedCategory && matchedCategory !== category) {
+      message += `, которая связана с категорией "${matchedCategory}" из твоего черного списка`;
+      if (similarityScore !== null) {
+        message += ` (близость: ${Math.round(similarityScore * 100)}%)`;
+      }
+      if (explanation) {
+        message += `.\n\n${explanation}`;
+      }
+    } else {
+      message += `, которая находится в твоем списке запрещенных категорий`;
+    }
+    
+    message += `\n\nТы сам добавил эту категорию в blacklist для контроля своих трат. Пожалуйста, не совершай эту покупку - это противоречит твоим финансовым целям.\n\nСценарий коммуникации завершен.`;
+    
+    return message;
+  }
+
   if (!openRouterAvailable) {
     // Fallback без AI
     const category = purchase.aiCategory || purchase.category || "";
@@ -309,7 +359,25 @@ export const generatePurchaseConfirmationAdvice = async (user, purchase, goalsWi
       context += ` Текущие накопления: ${user.currentSavings}₽.`;
     }
 
-    const prompt = `Ты финансовый ассистент-защитник, который УБЕДИТЕЛЬНО отговаривает от неразумных трат. Твоя задача - СДЕРЖАТЬ пользователя от импульсивной покупки.
+    // Добавляем информацию о долгах/кредитах
+    if (user.extendedProfile?.hasDebts) {
+      context += `\n\n⚠️ ВАЖНО: У пользователя есть кредиты или долги. Это означает, что любые дополнительные траты усугубляют финансовое положение. Нужно быть ОСОБЕННО настойчивым в отговоре от покупки.`;
+    }
+
+    // Добавляем информацию о рекомендуемых днях ожидания
+    if (purchase.recommendedDays && purchase.recommendedDays > 0) {
+      context += `\n\nРекомендуется подумать над покупкой ${purchase.recommendedDays} дней перед совершением.`;
+    }
+
+    // Пытаемся загрузить промпт из БД
+    let prompt;
+    try {
+      prompt = await renderPrompt("generatePurchaseAdvice", { context });
+      console.log("✅ Using prompt from DB: generatePurchaseAdvice");
+    } catch (error) {
+      console.log("⚠ Prompt not found in DB, using default:", error.message);
+      // Fallback на дефолтный промпт
+      prompt = `Ты финансовый ассистент-защитник, который УБЕДИТЕЛЬНО отговаривает от неразумных трат. Твоя задача - СДЕРЖАТЬ пользователя от импульсивной покупки.
 
 ${context}
 
@@ -325,6 +393,7 @@ ${context}
 Если сдвиг цели очень большой (сотни дней) - ОБЯЗАТЕЛЬНО подчеркни, что это катастрофический срок.
 
 Не используй markdown разметку, только обычный текст. Пиши так, как будто ты умоляешь близкого друга не совершать ошибку.`;
+    }
 
     const completion = await callOpenRouterWithRetry(prompt, 2, 400);
     const advice = completion?.choices?.[0]?.message?.content?.trim();
@@ -352,5 +421,245 @@ ${context}
       fallbackText += `\n\nЛучше добавь это в вишлист и обдумай покупку несколько дней.`;
     }
     return fallbackText;
+  }
+};
+
+// Парсинг профиля пользователя из текста через чат-бот
+export const parseUserProfile = async (conversationHistory = [], currentMessage = "") => {
+  if (!openRouterAvailable) {
+    console.log("⚠ AI недоступен для парсинга профиля");
+    return {
+      reply: "К сожалению, AI сервис недоступен. Пожалуйста, используй форму заполнения профиля.",
+      isProfileComplete: false,
+      parsedProfile: null
+    };
+  }
+
+  try {
+    // Формируем контекст для AI на основе истории разговора
+    const conversationContext = conversationHistory
+      .map(msg => `${msg.role === "user" ? "Пользователь" : "Ассистент"}: ${msg.content}`)
+      .join("\n");
+
+    const fullContext = conversationContext ? `${conversationContext}\nПользователь: ${currentMessage}` : `Пользователь: ${currentMessage}`;
+
+    // Список доступных категорий для парсинга
+    const availableCategories = [
+      "Рестораны и кафе",
+      "Фастфуд",
+      "Кофе навынос",
+      "Доставка еды",
+      "Такси и каршеринг",
+      "Подписки и сервисы",
+      "Онлайн-шопинг",
+      "Развлечения",
+      "Игры и внутриигровые покупки",
+      "Алкоголь и табак",
+      "Электроника и гаджеты",
+      "Одежда и аксессуары",
+      "Красота и уход",
+      "Путешествия",
+      "Хобби",
+      "Другое"
+    ].join(", ");
+
+    // Пытаемся загрузить промпт из БД
+    let prompt;
+    try {
+      prompt = await renderPrompt("parseUserProfile", {
+        conversationContext: fullContext,
+        availableCategories
+      });
+      console.log("✅ Using prompt from DB: parseUserProfile");
+    } catch (error) {
+      console.log("⚠ Prompt not found in DB, using default:", error.message);
+      // Fallback на дефолтный промпт
+      prompt = `Ты финансовый ассистент, который помогает заполнить профиль пользователя через диалог.
+
+=== ИСТОРИЯ РАЗГОВОРА ===
+${fullContext}
+
+=== ЗАДАЧА ===
+Проанализируй всю информацию, которую пользователь сообщил о себе, и:
+1. Извлеки структурированные данные о его финансовом профиле
+2. Задай уточняющие вопросы, если информации недостаточно
+3. Когда данных будет достаточно, верни полный профиль в формате JSON
+
+=== ДАННЫЕ, КОТОРЫЕ НУЖНО ИЗВЛЕЧЬ ===
+- salary: число, зарплата в месяц в рублях
+- currentSavings: число, текущие накопления в рублях
+- savingsPercentage: число от 0 до 100, процент от зарплаты, который хочет откладывать
+- topSpendingCategories: массив строк из списка доступных категорий - на что тратит больше всего
+- impulsiveCategories: массив строк - импульсивные траты
+- blockingCategories: массив строк - категории, мешающие целям
+- goals: массив объектов с полями {title: строка, price: число, priority: число от 1 до 10, description: строка}
+- hasDebts: булево значение - есть ли долги/кредиты
+
+=== ДОСТУПНЫЕ КАТЕГОРИИ ===
+${availableCategories}
+
+=== ПРАВИЛА ===
+1. Если информации недостаточно, задай уточняющие вопросы на русском языке
+2. Если информации достаточно, верни JSON объект с полями:
+   - reply: текстовый ответ пользователю
+   - isProfileComplete: true
+   - parsedProfile: объект со структурой профиля (см. выше)
+3. Если информации недостаточно, верни JSON объект:
+   - reply: уточняющий вопрос на русском
+   - isProfileComplete: false
+   - parsedProfile: null
+
+=== ВАЖНО - ЯЗЫК ===
+КРИТИЧЕСКИ ВАЖНО: Все текстовые поля ДОЛЖНЫ быть на РУССКОМ языке:
+- Названия целей (title) - ОБЯЗАТЕЛЬНО на русском. НИКОГДА не используй английский язык для названий целей!
+  Примеры правильных переводов:
+  - "Emergency fund" → "Подушка безопасности" или "Резервный фонд"
+  - "Vacation" → "Отпуск"
+  - "Apartment" → "Квартира"
+  - "Car" → "Автомобиль"
+  - "House" → "Дом"
+  - "Wedding" → "Свадьба"
+  - "Education" → "Образование"
+- Описания целей (description) - на русском
+- Все ответы (reply) - на русском
+- Категории должны быть из доступного списка на русском
+- Если пользователь упоминает цели на английском или другом языке, ОБЯЗАТЕЛЬНО переведи их на русский при сохранении
+
+=== ВАЖНО ===
+- Извлекай числа из текста (например, "50000 рублей" → 50000)
+- Маппи категории на доступные из списка (например, "ресторан" → "Рестораны и кафе")
+- Приоритет целей: 1 = самый высокий приоритет, 10 = самый низкий
+- Если пользователь не упомянул что-то - используй разумные значения по умолчанию или задай вопрос
+
+=== ОТВЕТ ===
+Верни ТОЛЬКО валидный JSON объект без markdown разметки, без дополнительного текста до/после.
+
+Пример ответа, если данных достаточно:
+{
+  "reply": "Отлично! Я собрал всю информацию. Профиль готов к сохранению.",
+  "isProfileComplete": true,
+  "parsedProfile": {
+    "salary": 100000,
+    "currentSavings": 50000,
+    "savingsPercentage": 20,
+    "extendedProfile": {
+      "topSpendingCategories": ["Рестораны и кафе", "Развлечения"],
+      "impulsiveCategories": ["Онлайн-шопинг"],
+      "blockingCategories": ["Фастфуд"],
+      "hasDebts": false
+    },
+    "goals": [
+      {"title": "Квартира", "price": 5000000, "priority": 1, "description": ""},
+      {"title": "Подушка безопасности", "price": 300000, "priority": 2, "description": "Резервный фонд на 6 месяцев"}
+    ]
+  }
+}
+
+Пример ответа, если данных недостаточно:
+{
+  "reply": "Спасибо! А сколько ты зарабатываешь в месяц?",
+  "isProfileComplete": false,
+  "parsedProfile": null
+}`;
+    }
+
+    const completion = await callOpenRouter(
+      [{ role: "user", content: prompt }],
+      {
+        maxTokens: 2000,
+        temperature: 0.7,
+        stream: false
+      }
+    );
+
+    let responseText = completion?.choices?.[0]?.message?.content?.trim();
+    if (!responseText) {
+      throw new Error("Empty AI response");
+    }
+
+    // Убираем markdown код блоки если есть
+    responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+    // Парсим JSON ответ
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Ошибка парсинга ответа AI:", parseError);
+      console.error("Содержимое:", responseText);
+      
+      // Fallback - пробуем извлечь JSON из текста
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("Не удалось распарсить ответ AI");
+      }
+    }
+
+    // Валидация структуры ответа
+    if (!result.reply) {
+      result.reply = "Спасибо за информацию! Могу ли я задать еще несколько вопросов?";
+    }
+
+    if (result.isProfileComplete && result.parsedProfile) {
+      // Валидация и нормализация данных профиля
+      const profile = result.parsedProfile;
+      
+      // Рассчитываем savingsPerMonth из процента, если указан
+      if (profile.salary && profile.savingsPercentage && !profile.savingsPerMonth) {
+        profile.savingsPerMonth = Math.round((profile.salary * profile.savingsPercentage) / 100);
+      }
+
+      // Убеждаемся, что extendedProfile существует
+      if (!profile.extendedProfile) {
+        profile.extendedProfile = {};
+      }
+
+      // Нормализуем массивы категорий
+      if (!Array.isArray(profile.extendedProfile.topSpendingCategories)) {
+        profile.extendedProfile.topSpendingCategories = [];
+      }
+      if (!Array.isArray(profile.extendedProfile.impulsiveCategories)) {
+        profile.extendedProfile.impulsiveCategories = [];
+      }
+      if (!Array.isArray(profile.extendedProfile.blockingCategories)) {
+        profile.extendedProfile.blockingCategories = [];
+      }
+
+      // Нормализуем цели
+      if (!Array.isArray(profile.goals)) {
+        profile.goals = [];
+      }
+
+      // Валидация: проверяем, что названия целей на русском языке (содержат кириллицу)
+      // Если названия на английском, предупреждаем в логах
+      if (profile.goals && profile.goals.length > 0) {
+        profile.goals = profile.goals.map(goal => {
+          if (goal.title) {
+            // Проверяем, содержит ли название кириллические символы
+            const hasCyrillic = /[а-яёА-ЯЁ]/.test(goal.title);
+            if (!hasCyrillic && goal.title.trim().length > 0) {
+              console.warn(`⚠ Предупреждение: название цели "${goal.title}" не содержит кириллицу. AI должен был перевести на русский.`);
+              // Можно добавить автоматический перевод здесь, но для этого нужен переводчик
+            }
+          }
+          return goal;
+        });
+      }
+
+      result.parsedProfile = profile;
+    }
+
+    return result;
+
+  } catch (error) {
+    console.error("❌ Ошибка парсинга профиля:", error.message);
+    
+    return {
+      reply: "Извини, произошла ошибка при обработке информации. Попробуй еще раз или переключись на форму заполнения.",
+      isProfileComplete: false,
+      parsedProfile: null
+    };
   }
 };
