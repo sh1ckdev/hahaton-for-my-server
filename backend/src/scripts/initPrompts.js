@@ -258,8 +258,6 @@ async function initPrompts() {
     console.log(`📦 База данных: ${dbNameFromUri}`);
     
     await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
