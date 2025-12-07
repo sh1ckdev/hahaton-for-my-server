@@ -32,7 +32,8 @@ WORKDIR /app
 ARG INTERNAL_PORT=3001
 
 # Переменная окружения для runtime
-ENV INTERNAL_PORT=${INTERNAL_PORT}
+ENV INTERNAL_PORT={INTERNAL_PORT:-3001}
+ENV PORT={INTERNAL_PORT:-3001}
 
 # Устанавливаем serve для раздачи статических файлов
 RUN npm install -g serve
@@ -43,6 +44,6 @@ COPY --from=builder /app/dist ./dist
 # Открываем порт (используем переменную или значение по умолчанию)
 EXPOSE ${INTERNAL_PORT}
 
-# Запускаем serve с портом из переменной окружения на всех интерфейсах (0.0.0.0)
-CMD sh -c "serve -s dist -l 0.0.0.0:${INTERNAL_PORT:-3001}"
+# Запускаем serve с указанием порта (serve по умолчанию слушает на всех интерфейсах)
+CMD sh -c "serve -s dist -l {INTERNAL_PORT:-3001}"
 
