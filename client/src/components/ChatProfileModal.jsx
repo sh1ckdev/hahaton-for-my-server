@@ -196,7 +196,7 @@ const ChatProfileModal = observer(({ onComplete }) => {
 Есть долги: ${profileData.extendedProfile.hasDebts ? "да" : "нет"}
           `.trim();
 
-          // Используем увеличенный timeout для AI-запроса (30 секунд)
+          // Используем увеличенный timeout для AI-запроса (30 унд)
           const blacklistResponse = await api.post("/ai/suggest-blacklist", {
             profileSummary: contextText
           }, {
