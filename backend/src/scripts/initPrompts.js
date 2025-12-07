@@ -250,9 +250,42 @@ const defaultPrompts = [
 
 async function initPrompts() {
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log("✅ Connected to MongoDB");
+    // Извлекаем имя базы данных из URI
+    const dbNameMatch = MONGODB_URI.match(/\/([^?]+)(\?|$)/);
+    const dbNameFromUri = dbNameMatch ? dbNameMatch[1] : 'unknown';
+    
+    console.log(`📡 Подключение к MongoDB для инициализации промптов...`);
+    console.log(`📦 База данных: ${dbNameFromUri}`);
+    
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    
+    const dbName = mongoose.connection.db?.databaseName;
+    console.log(`✅ Connected to MongoDB`);
+    console.log(`📊 Database name: ${dbName || 'unknown'}`);
+    console.log(`🌐 Host: ${mongoose.connection.host || 'unknown'}`);
+    
+    // Проверяем, существует ли база данных
+    try {
+      const adminDb = mongoose.connection.db.admin();
+      const { databases } = await adminDb.listDatabases();
+      const dbExists = databases.some(db => db.name === dbName);
+      
+      if (dbExists) {
+        console.log(`✅ База данных "${dbName}" уже существует`);
+      } else {
+        console.log(`⚠️  База данных "${dbName}" будет создана при первой записи`);
+      }
+    } catch (listError) {
+      console.log(`⚠️  Не удалось проверить список баз: ${listError.message}`);
+    }
 
+    console.log(`📝 Начинаем инициализацию ${defaultPrompts.length} промптов...`);
+    
     for (const promptData of defaultPrompts) {
       await upsertPrompt(promptData.key, {
         name: promptData.name,
@@ -264,10 +297,30 @@ async function initPrompts() {
       console.log(`✅ Initialized prompt: ${promptData.key}`);
     }
 
+    // Проверяем базу данных после записи
+    try {
+      const adminDb = mongoose.connection.db.admin();
+      const { databases } = await adminDb.listDatabases();
+      const dbExists = databases.some(db => db.name === dbName);
+      
+      if (dbExists) {
+        console.log(`✅ База данных "${dbName}" успешно создана и содержит данные`);
+      }
+      
+      // Получаем список коллекций
+      const collections = await mongoose.connection.db.listCollections().toArray();
+      console.log(`📚 Коллекции в базе: ${collections.map(c => c.name).join(', ') || 'нет'}`);
+    } catch (checkError) {
+      console.log(`⚠️  Не удалось проверить базу после записи: ${checkError.message}`);
+    }
+
     console.log("✅ All prompts initialized");
     await mongoose.disconnect();
   } catch (error) {
-    console.error("❌ Error initializing prompts:", error);
+    console.error("❌ Error initializing prompts:");
+    console.error("   Message:", error.message);
+    console.error("   Code:", error.code);
+    console.error("   Full error:", error);
     process.exit(1);
   }
 }

@@ -24,9 +24,14 @@ if (!uri) {
   process.exit(1);
 }
 
+// Извлекаем имя базы данных из URI для логирования
+const dbNameMatch = uri.match(/\/([^?]+)(\?|$)/);
+const dbNameFromUri = dbNameMatch ? dbNameMatch[1] : 'unknown';
+
 // Маскируем пароль в URI для логирования (безопасность)
 const uriForLog = uri.replace(/:[^:@]+@/, ":****@");
 console.log(`📡 Подключение к MongoDB: ${uriForLog}`);
+console.log(`📦 База данных из URI: ${dbNameFromUri}`);
 
 mongoose
   .connect(uri, {
@@ -35,10 +40,28 @@ mongoose
     serverSelectionTimeoutMS: 10000, // Таймаут подключения 10 секунд
     socketTimeoutMS: 45000, // Таймаут сокета 45 секунд
   })
-  .then(() => {
+  .then(async () => {
     console.log("✅ MongoDB connected successfully");
     console.log(`📊 Database: ${mongoose.connection.db?.databaseName || 'unknown'}`);
     console.log(`🌐 Host: ${mongoose.connection.host || 'unknown'}`);
+    console.log(`🔌 Port: ${mongoose.connection.port || 'unknown'}`);
+    
+    // Проверяем список баз данных для диагностики
+    try {
+      const adminDb = mongoose.connection.db.admin();
+      const { databases } = await adminDb.listDatabases();
+      console.log(`📚 Доступные базы данных: ${databases.map(db => db.name).join(', ') || 'нет'}`);
+      
+      // Проверяем, существует ли наша база данных
+      const ourDbExists = databases.some(db => db.name === mongoose.connection.db?.databaseName);
+      if (ourDbExists) {
+        console.log(`✅ База данных "${mongoose.connection.db?.databaseName}" найдена в списке`);
+      } else {
+        console.log(`⚠️  База данных "${mongoose.connection.db?.databaseName}" будет создана при первой записи`);
+      }
+    } catch (listError) {
+      console.log(`⚠️  Не удалось получить список баз данных (возможна проблема с правами): ${listError.message}`);
+    }
   })
   .catch((err) => {
     console.error("❌ MongoDB connection error:");
