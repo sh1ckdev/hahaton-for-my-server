@@ -12,6 +12,7 @@ services:
       - PORT=5000
       - MONGO_URI=${MONGO_URI}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_SECURE=${SMTP_SECURE:-false}
