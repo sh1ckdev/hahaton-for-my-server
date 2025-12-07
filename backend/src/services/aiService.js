@@ -319,8 +319,17 @@ export const generatePurchaseConfirmationAdvice = async (user, purchase, goalsWi
       fallbackText += `. Это составляет ${salaryPercentage}% от твоей месячной зарплаты - это ОЧЕНЬ МНОГО!`;
     }
     if (goalsWithShift.length > 0) {
+      // Дедупликация целей по _id, чтобы избежать дубликатов
+      const uniqueGoals = goalsWithShift.reduce((acc, goal) => {
+        const existing = acc.find(g => g._id?.toString() === goal._id?.toString());
+        if (!existing) {
+          acc.push(goal);
+        }
+        return acc;
+      }, []);
+      
       fallbackText += `\n\n⚠️ ВНИМАНИЕ: Эта покупка отложит твои важные цели:`;
-      goalsWithShift.forEach(goal => {
+      uniqueGoals.forEach(goal => {
         fallbackText += `\n• "${goal.title}" отложится на ${goal.shiftDays} дней`;
       });
       fallbackText += `\n\nПожалуйста, добавь эту покупку в вишлист и подумай несколько дней. Это мудрое решение!`;
@@ -344,8 +353,17 @@ export const generatePurchaseConfirmationAdvice = async (user, purchase, goalsWi
     }
 
     if (goalsWithShift.length > 0) {
+      // Дедупликация целей по _id, чтобы избежать дубликатов в контексте для AI
+      const uniqueGoals = goalsWithShift.reduce((acc, goal) => {
+        const existing = acc.find(g => g._id?.toString() === goal._id?.toString());
+        if (!existing) {
+          acc.push(goal);
+        }
+        return acc;
+      }, []);
+      
       context += `\n\nУ пользователя есть финансовые цели, которые пострадают от этой покупки (чем меньше число приоритета, тем важнее цель):`;
-      goalsWithShift.forEach(goal => {
+      uniqueGoals.forEach(goal => {
         context += `\n- "${goal.title}" (${goal.price}₽, приоритет ${goal.priority}) - сдвинется на ${goal.shiftDays} дней`;
       });
     }
@@ -398,7 +416,14 @@ ${context}
     const completion = await callOpenRouterWithRetry(prompt, 2, 400);
     const advice = completion?.choices?.[0]?.message?.content?.trim();
     
-    return advice || generatePurchaseConfirmationAdvice(user, purchase, goalsWithShift); // рекурсивный fallback
+    // Если AI вернул валидный ответ, используем его
+    if (advice && advice.length > 0) {
+      return advice;
+    }
+    
+    // Если AI вернул пустой ответ, используем fallback (не рекурсивно!)
+    console.warn("⚠️ AI вернул пустой ответ, используем fallback");
+    throw new Error("Empty AI response");
   } catch (err) {
     console.error("❌ AI advice generation failed:", err.message);
     // Fallback
@@ -412,8 +437,17 @@ ${context}
       fallbackText += `. Это составляет ${salaryPercentage}% от твоей месячной зарплаты - это ОЧЕНЬ МНОГО!`;
     }
     if (goalsWithShift.length > 0) {
+      // Дедупликация целей по _id, чтобы избежать дубликатов
+      const uniqueGoals = goalsWithShift.reduce((acc, goal) => {
+        const existing = acc.find(g => g._id?.toString() === goal._id?.toString());
+        if (!existing) {
+          acc.push(goal);
+        }
+        return acc;
+      }, []);
+      
       fallbackText += `\n\n⚠️ ВНИМАНИЕ: Эта покупка отложит твои важные цели:`;
-      goalsWithShift.forEach(goal => {
+      uniqueGoals.forEach(goal => {
         fallbackText += `\n• "${goal.title}" отложится на ${goal.shiftDays} дней`;
       });
       fallbackText += `\n\nПожалуйста, добавь эту покупку в вишлист и подумай несколько дней. Это мудрое решение!`;

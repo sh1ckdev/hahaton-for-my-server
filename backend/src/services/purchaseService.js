@@ -16,7 +16,7 @@ export const createPurchase = async (user, payload) => {
   const { title, price, category, useAiCategory, description, url } = payload;
 
   let finalTitle = title;
-  let finalCategory = category || "другое";
+  let finalCategory = category;
   let aiCategory = null;
 
   // Если есть URL, пытаемся извлечь информацию из него
@@ -41,11 +41,16 @@ export const createPurchase = async (user, payload) => {
     }
   }
 
+  // Если категория не указана ИЛИ явно запрошено использование AI - определяем категорию через AI
   if (useAiCategory || !category) {
     // Получаем список запрещенных категорий пользователя
     const excludeCategories = user.notificationSettings?.excludeCategories || [];
     aiCategory = await classifyCategory(finalTitle, description || url || "", excludeCategories);
-    finalCategory = aiCategory;
+    // Используем категорию от AI, если она определена, иначе fallback на "другое"
+    finalCategory = aiCategory || "другое";
+  } else {
+    // Если категория указана вручную, используем её
+    finalCategory = category;
   }
 
   const rules = await getUserCooldownRules(user.userId);

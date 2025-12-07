@@ -9,6 +9,8 @@ import {
   isPurchaseAllowedNow,
   updatePurchase
 } from "../services/purchaseService.js";
+import { generatePurchaseConfirmationAdvice } from "../services/aiService.js";
+import { calculateGoalsImpact } from "../services/goalService.js";
 
 export const listPurchases = async (req, res, next) => {
   try {
@@ -27,7 +29,21 @@ export const createPurchaseController = async (req, res, next) => {
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const purchase = await createPurchase(user, req.body || {});
-    res.status(201).json(purchase);
+    
+    // Автоматически генерируем AI-совет для пользователя
+    let advice = null;
+    try {
+      const goalsWithShift = await calculateGoalsImpact(user, purchase);
+      advice = await generatePurchaseConfirmationAdvice(user, purchase, goalsWithShift);
+    } catch (error) {
+      console.error("Ошибка при генерации AI-совета:", error.message);
+      // Не прерываем создание покупки, если не удалось сгенерировать совет
+    }
+    
+    res.status(201).json({
+      ...purchase.toObject(),
+      advice // Добавляем AI-совет в ответ
+    });
   } catch (e) {
     next(e);
   }
