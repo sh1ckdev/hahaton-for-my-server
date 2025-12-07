@@ -107,11 +107,32 @@ const ChatProfileModal = observer(({ onComplete }) => {
       }
     } catch (error) {
       console.error("Ошибка при отправке сообщения:", error);
+      console.error("Детали ошибки:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack
+      });
+      
       // Сохраняем сообщение для возможности повторной отправки
       setLastFailedMessage(userMessage.text);
+      
+      // Формируем более информативное сообщение об ошибке
+      let errorMessage = "Извини, произошла ошибка при обработке информации. Попробуй еще раз или переключись на форму заполнения.";
+      
+      if (error.response?.status === 500) {
+        errorMessage = "Сервер временно недоступен. Пожалуйста, попробуй позже или используй форму заполнения.";
+      } else if (error.response?.status === 404) {
+        errorMessage = "Пользователь не найден. Пожалуйста, обнови страницу и попробуй снова.";
+      } else if (error.response?.data?.error) {
+        errorMessage = `Ошибка: ${error.response.data.error}`;
+      } else if (!error.response) {
+        errorMessage = "Не удалось подключиться к серверу. Проверь интернет-соединение.";
+      }
+      
       setMessages(prev => [...prev, {
         role: "error",
-        text: "Извини, произошла ошибка. Попробуй еще раз или переключись на форму заполнения."
+        text: errorMessage
       }]);
     } finally {
       setLoading(false);

@@ -321,6 +321,7 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
       case 5:
         const salary = userStore.user?.salary || 0;
         const calculatedSavings = Math.round((salary * savingsPercentage) / 100);
+        const percentageWidth = (savingsPercentage / 50) * 100;
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold mb-2 text-white">
@@ -329,15 +330,29 @@ const ExtendedProfileModal = observer(({ onComplete }) => {
             <p className="text-sm text-white/70 mb-4">
               {savingsPercentage}% от зарплаты
             </p>
-            <input
-              type="range"
-              min="0"
-              max="50"
-              value={savingsPercentage}
-              onChange={(e) => setSavingsPercentage(Number(e.target.value))}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-white/60 mb-4">
+            <div className="range-slider-wrapper">
+              <div 
+                className="range-progress"
+                style={{ width: `${percentageWidth}%` }}
+              />
+              <input
+                type="range"
+                min="0"
+                max="50"
+                step="1"
+                value={savingsPercentage}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setSavingsPercentage(value);
+                }}
+                onInput={(e) => {
+                  const value = Number(e.target.value);
+                  setSavingsPercentage(value);
+                }}
+                className="w-full relative z-10"
+              />
+            </div>
+            <div className="flex justify-between text-xs text-white/60 mb-4 px-1">
               <span>0%</span>
               <span>25%</span>
               <span>50%</span>
