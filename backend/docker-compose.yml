@@ -1,21 +1,4 @@
-version: '3.8'
-
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: rational-assistant-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: rational_assistant
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - rational-assistant-network
-
   backend:
     build:
       context: .
@@ -42,17 +25,11 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - FRONTEND_URL=${FRONTEND_URL}
       - CLIENT_ORIGIN=${CLIENT_ORIGIN}
-    depends_on:
-      - mongodb
     networks:
       - rational-assistant-network
     volumes:
       - ./src:/app/src
       - /app/node_modules
-
-volumes:
-  mongodb_data:
-    driver: local
 
 networks:
   rational-assistant-network:

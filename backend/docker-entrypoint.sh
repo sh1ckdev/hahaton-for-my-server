@@ -3,15 +3,7 @@ set -e
 
 echo "🚀 Starting backend initialization..."
 
-# Ждем, пока MongoDB будет готова
-echo "⏳ Waiting for MongoDB to be ready..."
-until nc -z mongodb 27017 2>/dev/null; do
-  echo "   MongoDB is unavailable - sleeping"
-  sleep 1
-done
-echo "✅ MongoDB is ready!"
-
-# Инициализируем промпты
+# Инициализируем промпты (MongoDB подключается автоматически через MONGO_URI из переменных окружения)
 echo "📝 Initializing prompts..."
 npm run init-prompts
 
