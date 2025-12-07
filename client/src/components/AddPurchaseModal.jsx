@@ -27,27 +27,33 @@ const AddPurchaseModal = observer(({ onClose }) => {
 
     setLoading(true);
     try {
-      // Создаем покупку (увеличиваем таймаут для AI-классификации категории)
+      // Создаем покупку (увеличиваем таймаут для AI-классификации категории и генерации совета)
+      // Если категория не выбрана, всегда используем AI для её определения
+      // Если категория выбрана, но включен чекбокс - переопределяем через AI
       const response = await api.post(`/purchases/${userStore.userId}`, {
         title,
         price: Number(price),
         category: category || undefined,
         url: url || undefined,
-        useAiCategory: ai && !category
+        useAiCategory: !category || (category && ai) // Используем AI, если категория не выбрана или если выбрана, но нужно переопределить
       }, {
-        timeout: 30000 // 30 секунд для AI-классификации
+        timeout: 60000 // 60 секунд для AI-классификации и генерации совета
       });
 
       const purchase = response.data;
+      console.log("📦 Покупка создана:", purchase);
+      console.log("💬 Совет от AI:", purchase.advice ? "присутствует" : "отсутствует");
       setCreatedPurchase(purchase);
 
       // Если покупка не заблокирована, показываем совет ассистента (приходит в ответе)
       if (purchase.status === "planned" && !purchase.blockedByCategory) {
         if (purchase.advice) {
+          console.log("✅ Показываю совет от AI");
           setAdvice(purchase.advice);
           setShowAdvice(true);
         } else {
           // Если совет не пришел, показываем стандартное сообщение
+          console.warn("⚠️ Совет от AI не пришел, показываю fallback");
           setAdvice("Покупка добавлена. Хотите добавить её в вишлист?");
           setShowAdvice(true);
         }
@@ -94,11 +100,17 @@ const AddPurchaseModal = observer(({ onClose }) => {
   const handleCancel = async () => {
     if (!createdPurchase) return;
     
-    // Отменяем покупку
-    await api.post(`/purchases/cancel/${createdPurchase._id}`);
-    await purchaseStore.loadForUser(userStore.userId);
-    setShowAdvice(false);
-    onClose();
+    try {
+      // Отменяем покупку (помечаем как canceled, она не будет показываться в вишлисте)
+      await api.post(`/purchases/cancel/${createdPurchase._id}`);
+      console.log("✅ Покупка отменена");
+      await purchaseStore.loadForUser(userStore.userId);
+      setShowAdvice(false);
+      onClose();
+    } catch (error) {
+      console.error("Ошибка при отмене покупки:", error);
+      alert("Ошибка при отмене покупки");
+    }
   };
 
   // Показываем модалку с советом ассистента
@@ -182,10 +194,17 @@ const AddPurchaseModal = observer(({ onClose }) => {
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
-        <label className="flex gap-2 text-sm text-white/80">
-          <input type="checkbox" checked={ai} onChange={e=>setAi(e.target.checked)}/> 
-          Использовать AI для категории (если не выбрана)
-        </label>
+        {category && (
+          <label className="flex gap-2 text-sm text-white/80">
+            <input type="checkbox" checked={ai} onChange={e=>setAi(e.target.checked)}/> 
+            Переопределить категорию через AI
+          </label>
+        )}
+        {!category && (
+          <p className="text-xs text-white/60">
+            Категория будет определена автоматически через AI
+          </p>
+        )}
         <button 
           onClick={submit} 
           disabled={loading}

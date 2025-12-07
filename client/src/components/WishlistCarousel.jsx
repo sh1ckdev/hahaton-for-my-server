@@ -270,8 +270,8 @@ const WishlistCarousel = observer(() => {
                   </span>
                 </div>
               )}
-              {comfortable && comfortable.getTime() > (cooldown?.getTime() || 0) && (
-                <div className="text-xs text-blue-400/80">
+              {comfortable && (
+                <div className="text-xs text-blue-400/80 mb-1">
                   Комфортно купить с{" "}
                   <span className="text-blue-300 font-medium">
                     {comfortable.toLocaleDateString()}
