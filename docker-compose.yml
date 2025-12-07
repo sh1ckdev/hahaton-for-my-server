@@ -4,16 +4,14 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        - INTERNAL_PORT=${INTERNAL_PORT:-3001}
         - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
     container_name: rational-assistant-frontend
     restart: unless-stopped
     env_file:
       - .env
     ports:
-      - "${EXTERNAL_PORT:-3001}:${INTERNAL_PORT:-3001}"
+      - "${EXTERNAL_PORT:-3001}:3001"
     environment:
-      - INTERNAL_PORT=${INTERNAL_PORT:-3001}
       - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
     networks:
       - rational-assistant-network

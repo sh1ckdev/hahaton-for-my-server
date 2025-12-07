@@ -28,12 +28,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Аргумент для внутреннего порта (build-time)
-ARG INTERNAL_PORT=3001
-
-# Переменная окружения для runtime
-ENV INTERNAL_PORT={INTERNAL_PORT:-3001}
-ENV PORT={INTERNAL_PORT:-3001}
+# Переменная окружения для порта (жестко установлен 3001)
+ENV PORT=3001
 
 # Устанавливаем serve для раздачи статических файлов
 RUN npm install -g serve
@@ -41,9 +37,9 @@ RUN npm install -g serve
 # Копируем собранные файлы из builder
 COPY --from=builder /app/dist ./dist
 
-# Открываем порт (используем переменную или значение по умолчанию)
-EXPOSE ${INTERNAL_PORT}
+# Открываем порт 3001
+EXPOSE 3001
 
-# Запускаем serve с указанием порта (serve по умолчанию слушает на всех интерфейсах)
-CMD sh -c "serve -s dist -l {INTERNAL_PORT:-3001}"
+# Запускаем serve на порту 3001 (serve по умолчанию слушает на всех интерфейсах)
+CMD serve -s dist -l 3001
 
