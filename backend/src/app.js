@@ -10,19 +10,11 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import goalRoutes from "./routes/goalRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import promptRoutes from "./routes/promptRoutes.js";
 
 const app = express();
 
-// Разрешенные origins для CORS
-const defaultOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:4173',
-];
-
+// Разрешенные origins для CORS - ТОЛЬКО из переменных окружения
 const parseOrigins = (raw) => {
   if (!raw) return [];
   return raw
@@ -31,10 +23,12 @@ const parseOrigins = (raw) => {
     .filter(Boolean);
 };
 
-const allowedOrigins = [
-  ...defaultOrigins,
-  ...parseOrigins(process.env.CLIENT_ORIGIN),
-].filter((value, index, array) => array.indexOf(value) === index);
+const allowedOrigins = parseOrigins(process.env.CLIENT_ORIGIN);
+
+if (allowedOrigins.length === 0) {
+  console.error("❌ CLIENT_ORIGIN не установлен в переменных окружения. CORS не будет работать!");
+  process.exit(1);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -44,6 +38,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.error(`❌ CORS: Origin "${origin}" не разрешен. Разрешенные: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -67,6 +62,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/prompts", promptRoutes);
 
 // обработка ошибок
 app.use((err, req, res, next) => {

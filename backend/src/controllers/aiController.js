@@ -1,4 +1,4 @@
-import { classifyCategory, generateBlacklist, generatePurchaseConfirmationAdvice } from "../services/aiService.js";
+import { classifyCategory, generateBlacklist, generatePurchaseConfirmationAdvice, parseUserProfile } from "../services/aiService.js";
 import { getPurchaseById } from "../services/purchaseService.js";
 import { getUserProfile } from "../services/userService.js";
 import { calculateGoalsImpact } from "../services/goalService.js";
@@ -43,6 +43,44 @@ export const chatController = async (req, res) => {
     const { userId, message } = req.body;
     
     const user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Проверяем, нужно ли запросить накопления
+    // Если considerSavings включен, но накоплений нет или они равны 0, запрашиваем
+    if (user.considerSavings && (!user.currentSavings || user.currentSavings === 0)) {
+      const messageLower = message.toLowerCase().trim();
+      // Проверяем, не является ли сообщение уже ответом на запрос накоплений
+      const isSavingsResponse = /^\d+/.test(message) || 
+                                /накоплени/i.test(message) || 
+                                /у меня/i.test(message) && /\d+/.test(message);
+      
+      if (!isSavingsResponse) {
+        // Запрашиваем накопления
+        return res.json({
+          answer: "Для расчета оптимальной даты покупки мне нужно знать размер твоих текущих накоплений. Пожалуйста, укажи сумму, которую ты сейчас отложил (в рублях).",
+          requiresSavings: true
+        });
+      } else {
+        // Пытаемся извлечь число из сообщения
+        const savingsMatch = message.match(/(\d+[\s,.]?\d*)/);
+        if (savingsMatch) {
+          const savingsAmount = parseFloat(savingsMatch[1].replace(/\s/g, '').replace(',', '.'));
+          if (!isNaN(savingsAmount) && savingsAmount >= 0) {
+            // Обновляем накопления пользователя
+            user.currentSavings = savingsAmount;
+            await user.save();
+            
+            return res.json({
+              answer: `Спасибо! Я запомнил, что у тебя ${savingsAmount.toLocaleString()}₽ накоплений. Теперь я смогу точнее рассчитать, когда тебе будет комфортно совершить покупку. Чем еще могу помочь?`,
+              requiresSavings: false
+            });
+          }
+        }
+      }
+    }
+    
     // Находим цели пользователя, отсортированные по приоритету
     const goals = await Goal.find({ userId, isCompleted: false }).sort({ priority: 1 });
     const highestPriorityGoal = goals[0]; // Самая приоритетная цель
@@ -50,12 +88,12 @@ export const chatController = async (req, res) => {
     let context = "";
     if (highestPriorityGoal && user.savingsPerMonth) {
       // Простой расчет сдвига для чата
-      const deficit = highestPriorityGoal.price - user.currentSavings;
+      const deficit = highestPriorityGoal.price - (user.currentSavings || 0);
       const shiftDays = deficit > 0 ? Math.ceil(deficit / (user.savingsPerMonth / 30)) : 0;
       context = `Текущая приоритетная цель: ${highestPriorityGoal.title} (${highestPriorityGoal.price}₽), покупка может отложить её на ~${shiftDays} дней.\n`;
     }
     
-        const prompt = `
+    const prompt = `
     Ты финансовый ассистент.
     ${context}
     
@@ -69,7 +107,7 @@ export const chatController = async (req, res) => {
     );
     const answer = completion?.choices?.[0]?.message?.content.trim();
 
-    res.json({answer});
+    res.json({answer, requiresSavings: false});
 
   } catch (e) {
     console.error(e);
@@ -110,5 +148,29 @@ export const getPurchaseAdviceController = async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to generate purchase advice" });
+  }
+};
+
+export const parseProfileController = async (req, res) => {
+  try {
+    const { userId, message, conversationHistory = [] } = req.body;
+    
+    if (!userId || !message) {
+      return res.status(400).json({ error: "userId and message are required" });
+    }
+
+    // Проверяем, что пользователь существует
+    const user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Вызываем функцию парсинга профиля
+    const result = await parseUserProfile(conversationHistory, message);
+
+    res.json(result);
+  } catch (e) {
+    console.error("Error parsing profile:", e);
+    res.status(500).json({ error: "Failed to parse profile" });
   }
 };

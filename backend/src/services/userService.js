@@ -25,6 +25,27 @@ export const upsertUserProfile = async (userId, payload) => {
   }
 
   // ---- Старый пользователь — обновляем, но не трогаем isFirstLogin ----
+  // Если обновляется extendedProfile с savingsPercentage, автоматически рассчитываем savingsPerMonth
+  if (payload.extendedProfile?.savingsPercentage !== undefined) {
+    const user = await User.findOne({ userId });
+    if (user && user.salary > 0) {
+      const calculatedSavingsPerMonth = Math.round((user.salary * payload.extendedProfile.savingsPercentage) / 100);
+      // Если savingsPerMonth не указан явно, используем рассчитанное значение
+      if (payload.savingsPerMonth === undefined) {
+        payload.savingsPerMonth = calculatedSavingsPerMonth;
+      }
+    }
+  }
+  
+  // Если обновляется salary и есть savingsPercentage, пересчитываем savingsPerMonth
+  if (payload.salary !== undefined && payload.savingsPerMonth === undefined) {
+    const user = await User.findOne({ userId });
+    if (user?.extendedProfile?.savingsPercentage !== undefined && user.extendedProfile.savingsPercentage > 0) {
+      const calculatedSavingsPerMonth = Math.round((payload.salary * user.extendedProfile.savingsPercentage) / 100);
+      payload.savingsPerMonth = calculatedSavingsPerMonth;
+    }
+  }
+
   const updated = await User.findOneAndUpdate(
     { userId },
     { $set: payload },

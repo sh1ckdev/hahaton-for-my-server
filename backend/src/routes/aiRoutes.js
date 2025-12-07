@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { classifyCategoryController, suggestBlacklistController, chatController, getPurchaseAdviceController } from "../controllers/aiController.js";
+import { classifyCategoryController, suggestBlacklistController, chatController, getPurchaseAdviceController, parseProfileController } from "../controllers/aiController.js";
 
 const router = Router();
 
@@ -90,5 +90,30 @@ router.post("/chat", chatController);
  *         description: Совет AI
  */
 router.get("/purchase-advice/:purchaseId", getPurchaseAdviceController);
+
+/**
+ * @swagger
+ * /api/ai/parse-profile:
+ *   post:
+ *     summary: Парсинг профиля пользователя из текста через чат-бот
+ *     tags: [AI]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *               conversationHistory:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Результат парсинга профиля
+ */
+router.post("/parse-profile", parseProfileController);
 
 export default router;

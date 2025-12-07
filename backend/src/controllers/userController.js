@@ -86,7 +86,8 @@ import {
         salary,
         currentSavings,
         savingsPerMonth,
-        spentThisMonth
+        spentThisMonth,
+        considerSavings
       } = req.body;
 
       const updatePayload = {};
@@ -94,6 +95,7 @@ import {
       if (typeof salary === "number") updatePayload.salary = salary;
       if (typeof currentSavings === "number") updatePayload.currentSavings = currentSavings;
       if (typeof savingsPerMonth === "number") updatePayload.savingsPerMonth = savingsPerMonth;
+      if (typeof considerSavings === "boolean") updatePayload.considerSavings = considerSavings;
 
       // 👉 если хочешь считать траты базово — можно сохранить здесь
       if (typeof spentThisMonth === "number") {

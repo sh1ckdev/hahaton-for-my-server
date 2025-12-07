@@ -5,7 +5,8 @@
     "main": "src/server.js",
     "scripts": {
         "start": "node src/server.js",
-        "dev": "nodemon src/server.js"
+        "dev": "nodemon src/server.js",
+        "init-prompts": "node src/scripts/initPrompts.js"
     },
     "dependencies": {
         "@openrouter/sdk": "^0.2.9",

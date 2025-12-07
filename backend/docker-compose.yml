@@ -24,20 +24,24 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - MONGO_URI=mongodb://admin:password@mongodb:27017/rational_assistant?authSource=admin
+      - MONGO_URI=${MONGO_URI}
+      - MONGODB_URI=${MONGODB_URI:-${MONGO_URI}}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - SMTP_FROM=${SMTP_FROM:-${SMTP_USER}}
+      - SMTP_FROM=${SMTP_FROM}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - CLIENT_ORIGIN=${CLIENT_ORIGIN:-http://localhost:3000,http://localhost:5173}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - CLIENT_ORIGIN=${CLIENT_ORIGIN}
     depends_on:
       - mongodb
     networks:
