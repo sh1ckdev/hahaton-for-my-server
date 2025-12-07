@@ -1,19 +1,4 @@
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: rational-assistant-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: rational_assistant
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - rational-assistant-network
-
   backend:
     build:
       context: ./backend
@@ -25,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - MONGO_URI=mongodb://admin:password@mongodb:27017/rational_assistant?authSource=admin
+      - MONGO_URI=${MONGO_URI}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -36,17 +21,11 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - CLIENT_ORIGIN=${CLIENT_ORIGIN:-http://localhost:3000,http://localhost:5173}
-    depends_on:
-      - mongodb
     networks:
       - rational-assistant-network
     volumes:
       - ./backend/src:/app/src
       - /app/node_modules
-
-volumes:
-  mongodb_data:
-    driver: local
 
 networks:
   rational-assistant-network:
