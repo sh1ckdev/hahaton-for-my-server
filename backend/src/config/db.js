@@ -25,18 +25,22 @@ if (!uri) {
 }
 
 // Извлекаем имя базы данных из URI для логирования
-const dbNameMatch = uri.match(/\/([^?]+)(\?|$)/);
-const dbNameFromUri = dbNameMatch ? dbNameMatch[1] : 'unknown';
+// Формат: mongodb://user:pass@host:port/database?options
+const uriParts = uri.match(/mongodb:\/\/[^/]+\/([^?]+)(\?|$)/);
+const dbNameFromUri = uriParts ? uriParts[1] : 'unknown';
 
 // Маскируем пароль в URI для логирования (безопасность)
 const uriForLog = uri.replace(/:[^:@]+@/, ":****@");
+// Извлекаем хост из URI для логирования
+const hostMatch = uri.match(/mongodb:\/\/[^@]+@([^:/]+)/);
+const hostFromUri = hostMatch ? hostMatch[1] : 'unknown';
+
 console.log(`📡 Подключение к MongoDB: ${uriForLog}`);
+console.log(`🌐 Хост из URI: ${hostFromUri}`);
 console.log(`📦 База данных из URI: ${dbNameFromUri}`);
 
 mongoose
   .connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 10000, // Таймаут подключения 10 секунд
     socketTimeoutMS: 45000, // Таймаут сокета 45 секунд
   })
