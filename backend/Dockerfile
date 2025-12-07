@@ -1,9 +1,6 @@
 # Используем официальный образ Node.js
 FROM node:20-alpine
 
-# Устанавливаем netcat для проверки доступности MongoDB
-RUN apk add --no-cache netcat-openbsd
-
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
